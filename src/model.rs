@@ -157,8 +157,9 @@ impl<'a> ExpressionFormatter<'a> {
             Expression::Terminal { name, value } => {
                 self.write_str(name)?;
                 if let Some(value) = value {
-                    self.write_str(": ")?;
+                    self.write_str(": \"")?;
                     self.write_str(value)?;
+                    self.write_char('"')?;
                 }
                 self.write_char(')')?;
             }
@@ -232,14 +233,13 @@ impl TestCase {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
-    use super::{Expression, TestCase};
+    use super::{Expression, ExpressionFormatter, TestCase};
     use crate::{
         parser::{Rule, TestParser},
         Error,
     };
     use indoc::indoc;
+    use std::collections::HashSet;
 
     const TEXT: &str = indoc! {r#"
     My Test
@@ -374,6 +374,35 @@ mod tests {
         let s_expression = assert_nonterminal_sexpr(&s_expression[0], "return_statement");
         assert_eq!(s_expression.len(), 1);
         assert_terminal_sexpr(&s_expression[0], "number", Some("1"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_format() -> Result<(), Error<Rule>> {
+        let mut writer = String::new();
+        let mut formatter = ExpressionFormatter::from_defaults(&mut writer);
+        let test_case: TestCase = TestParser::parse(TEXT)
+            .map_err(|source| Error::Parser { source })
+            .and_then(|pair| {
+                TestCase::try_from_pair(pair).map_err(|source| Error::Model { source })
+            })?;
+        formatter
+            .fmt(&test_case.expression)
+            .expect("Error formatting expression");
+        let expected = indoc! {r#"
+        (source_file
+          (function_definition
+            (identifier: "x")
+            (parameter_list)
+            (primitive_type: "int")
+            (block
+              (return_statement
+                (number: "1")
+              )
+            )
+          )
+        )"#};
+        assert_eq!(writer, expected);
         Ok(())
     }
 }

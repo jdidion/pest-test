@@ -31,6 +31,9 @@ pub struct PestTester<R: RuleType, P: Parser<R>> {
 }
 
 impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
+    /// Creates a new `PestTester` that looks for tests in `test_dir` and having file extension
+    /// `test_ext`. Code is parsed beinning at `rule` and the rules in `skip_rule` are ignored
+    /// when comparing to the expected expression.
     pub fn new<D: Into<PathBuf>, S: AsRef<str>>(
         test_dir: D,
         test_ext: S,
@@ -46,6 +49,9 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
         }
     }
 
+    /// Creates a new `PestTester` that looks for tests in `<crate root>/tests?parser` and having
+    /// file extension ".txt". Code is parsed beinning at `rule` and the rules in `skip_rule` are
+    /// ignored when comparing to the expected expression.
     pub fn from_defaults(rule: R, skip_rules: HashSet<R>) -> Self {
         let default_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("tests")
@@ -54,6 +60,8 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
         Self::new(default_dir, default_ext, rule, skip_rules)
     }
 
+    /// Evaluates the test with the given name. If `ignore_missing_expected_values` is true, then
+    /// the test is not required to specify values for non-terminal nodes.
     pub fn evaluate<N: AsRef<str>>(
         &self,
         name: N,
@@ -86,6 +94,7 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
         }
     }
 
+    /// Equivalent to `self.evaluate(name, true)
     pub fn evaluate_strict<N: AsRef<str>>(&self, name: N) -> Result<(), Error<R>> {
         self.evaluate(name, false)
     }
