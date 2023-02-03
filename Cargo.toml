@@ -1,0 +1,17 @@
+[package]
+name = "pest-test"
+description = "Testing framework for pest parsers"
+version = "0.1.0"
+keywords = ["parsing", "pest"]
+categories = ["parsing"]
+repository = "https://github.com/jdidion/pest-test"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+colored = "2.0.0"
+pest = "2.5.2"
+pest_derive = "2.5.2"
+
+[dev-dependencies]
+indoc = "2.0.0"
