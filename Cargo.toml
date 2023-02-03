@@ -12,6 +12,7 @@ license = "MIT"
 colored = "2.0.0"
 pest = "2.5.2"
 pest_derive = "2.5.2"
+thiserror = "1.0.38"
 
 [dev-dependencies]
 indoc = "2.0.0"

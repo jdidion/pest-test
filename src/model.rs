@@ -5,8 +5,10 @@ use std::{
     collections::HashSet,
     fmt::{Display, Result as FmtResult, Write},
 };
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
+#[error("Error creating model element from parser pair")]
 pub struct ModelError(String);
 
 impl ModelError {
@@ -236,7 +238,7 @@ mod tests {
     use super::{Expression, ExpressionFormatter, TestCase};
     use crate::{
         parser::{Rule, TestParser},
-        Error,
+        TestError,
     };
     use indoc::indoc;
     use std::collections::HashSet;
@@ -325,11 +327,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parse() -> Result<(), Error<Rule>> {
+    fn test_parse() -> Result<(), TestError<Rule>> {
         let test_case: TestCase = TestParser::parse(TEXT)
-            .map_err(|source| Error::Parser { source })
+            .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| Error::Model { source })
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
             })?;
         assert_eq!(test_case.name, "My Test");
         assert_eq!(test_case.code, "fn x() int {\n  return 1;\n}");
@@ -350,11 +352,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_from_code() -> Result<(), Error<Rule>> {
-        let test_pair = TestParser::parse(TEXT).map_err(|source| Error::Parser { source })?;
+    fn test_parse_from_code() -> Result<(), TestError<Rule>> {
+        let test_pair = TestParser::parse(TEXT).map_err(|source| TestError::Parser { source })?;
         let skip_rules = HashSet::from([Rule::EOI]);
         let code_expression = Expression::try_from_code(test_pair, &skip_rules)
-            .map_err(|source| Error::Model { source })?;
+            .map_err(|source| TestError::Model { source })?;
         let children = assert_nonterminal(&code_expression, "test_case");
         assert_eq!(children.len(), 3);
         assert_terminal(&children[0], "test_name", Some("My Test"));
@@ -378,13 +380,13 @@ mod tests {
     }
 
     #[test]
-    fn test_format() -> Result<(), Error<Rule>> {
+    fn test_format() -> Result<(), TestError<Rule>> {
         let mut writer = String::new();
         let mut formatter = ExpressionFormatter::from_defaults(&mut writer);
         let test_case: TestCase = TestParser::parse(TEXT)
-            .map_err(|source| Error::Parser { source })
+            .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| Error::Model { source })
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
             })?;
         formatter
             .fmt(&test_case.expression)

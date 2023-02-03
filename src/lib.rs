@@ -12,13 +12,19 @@ use std::{
     collections::HashSet, fs::read_to_string, io::Error as IOError, marker::PhantomData,
     path::PathBuf,
 };
+use thiserror::Error;
 
-#[derive(Debug)]
-pub enum Error<R> {
+#[derive(Error, Debug)]
+pub enum TestError<R> {
+    #[error("Error reading test case from file")]
     IO { source: IOError },
+    #[error("Error parsing test case")]
     Parser { source: ParserError<Rule> },
+    #[error("Error building model from test case parse tree")]
     Model { source: ModelError },
+    #[error("Error parsing code with target parser")]
     Target { source: PestError<R> },
+    #[error("Expected and actual parse trees are different:\n{diff}")]
     Diff { diff: ExpressionDiff },
 }
 
@@ -66,36 +72,38 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
         &self,
         name: N,
         ignore_missing_expected_values: bool,
-    ) -> Result<(), Error<R>> {
+    ) -> Result<(), TestError<R>> {
         let path = self
             .test_dir
             .join(format!("{}.{}", name.as_ref(), self.test_ext));
-        let text = read_to_string(path).map_err(|source| Error::IO { source })?;
-        let pair = TestParser::parse(text.as_ref()).map_err(|source| Error::Parser { source })?;
-        let test_case = TestCase::try_from_pair(pair).map_err(|source| Error::Model { source })?;
+        let text = read_to_string(path).map_err(|source| TestError::IO { source })?;
+        let pair =
+            TestParser::parse(text.as_ref()).map_err(|source| TestError::Parser { source })?;
+        let test_case =
+            TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })?;
         let code_pair =
             parser::parse(test_case.code.as_ref(), self.rule, self.parser).map_err(|source| {
                 match source {
-                    ParserError::Empty => Error::Parser {
+                    ParserError::Empty => TestError::Parser {
                         source: ParserError::Empty,
                     },
-                    ParserError::Pest { source } => Error::Target { source },
+                    ParserError::Pest { source } => TestError::Target { source },
                 }
             })?;
         let code_expr = Expression::try_from_code(code_pair, &self.skip_rules)
-            .map_err(|source| Error::Model { source })?;
+            .map_err(|source| TestError::Model { source })?;
         match ExpressionDiff::from_expressions(
             &test_case.expression,
             &code_expr,
             ignore_missing_expected_values,
         ) {
             ExpressionDiff::Equal(_) => Ok(()),
-            diff => Err(Error::Diff { diff }),
+            diff => Err(TestError::Diff { diff }),
         }
     }
 
     /// Equivalent to `self.evaluate(name, true)
-    pub fn evaluate_strict<N: AsRef<str>>(&self, name: N) -> Result<(), Error<R>> {
+    pub fn evaluate_strict<N: AsRef<str>>(&self, name: N) -> Result<(), TestError<R>> {
         self.evaluate(name, false)
     }
 }

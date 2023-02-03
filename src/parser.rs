@@ -1,10 +1,13 @@
-use pest::{error::Error, iterators::Pair, Parser, RuleType};
+use pest::{error::Error as PestError, iterators::Pair, Parser, RuleType};
 use pest_derive;
 use std::marker::PhantomData;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ParserError<R> {
-    Pest { source: Error<R> },
+    #[error("Error parsing source text")]
+    Pest { source: PestError<R> },
+    #[error("Empty parse tree")]
     Empty,
 }
 
