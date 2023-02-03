@@ -154,7 +154,7 @@ impl ExpressionDiff {
     }
 }
 
-trait DiffExt {
+pub trait ExpressionDiffFormatterExt {
     fn fmt_diff(
         &mut self,
         diff: &ExpressionDiff,
@@ -163,7 +163,7 @@ trait DiffExt {
     ) -> FmtResult;
 }
 
-impl<'a> DiffExt for ExpressionFormatter<'a> {
+impl<'a> ExpressionDiffFormatterExt for ExpressionFormatter<'a> {
     fn fmt_diff(
         &mut self,
         diff: &ExpressionDiff,
@@ -217,12 +217,13 @@ impl Display for ExpressionDiff {
 
 #[cfg(test)]
 mod tests {
-    use super::ExpressionDiff;
+    use super::{ExpressionDiff, ExpressionDiffFormatterExt};
     use crate::{
-        model::{Expression, TestCase},
+        model::{Expression, ExpressionFormatter, TestCase},
         parser::Rule,
         TestError, TestParser,
     };
+    use colored::Color;
     use indoc::indoc;
 
     const TEXT: &str = indoc! {r#"
@@ -249,6 +250,39 @@ mod tests {
       )
     )
     "#};
+
+    fn make_expected_sexpression() -> Expression {
+        Expression::NonTerminal {
+            name: String::from("source_file"),
+            children: Vec::from([Expression::NonTerminal {
+                name: String::from("function_definition"),
+                children: Vec::from([
+                    Expression::Terminal {
+                        name: String::from("identifier"),
+                        value: Some(String::from("y")),
+                    },
+                    Expression::NonTerminal {
+                        name: String::from("missing"),
+                        children: Vec::from([Expression::Terminal {
+                            name: String::from("foo"),
+                            value: None,
+                        }]),
+                    },
+                    Expression::Terminal {
+                        name: String::from("primitive_type"),
+                        value: None,
+                    },
+                    Expression::NonTerminal {
+                        name: String::from("block"),
+                        children: Vec::from([Expression::Terminal {
+                            name: String::from("return_statement"),
+                            value: None,
+                        }]),
+                    },
+                ]),
+            }]),
+        }
+    }
 
     fn assert_partial<'a>(
         diff: &'a ExpressionDiff,
@@ -362,42 +396,13 @@ mod tests {
     }
 
     #[test]
-    fn test_diff() -> Result<(), TestError<Rule>> {
+    fn test_diff_strict() -> Result<(), TestError<Rule>> {
         let test_case: TestCase = TestParser::parse(TEXT)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
                 TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
             })?;
-        let expected_sexpr = Expression::NonTerminal {
-            name: String::from("source_file"),
-            children: Vec::from([Expression::NonTerminal {
-                name: String::from("function_definition"),
-                children: Vec::from([
-                    Expression::Terminal {
-                        name: String::from("identifier"),
-                        value: Some(String::from("y")),
-                    },
-                    Expression::NonTerminal {
-                        name: String::from("missing"),
-                        children: Vec::from([Expression::Terminal {
-                            name: String::from("foo"),
-                            value: None,
-                        }]),
-                    },
-                    Expression::Terminal {
-                        name: String::from("primitive_type"),
-                        value: None,
-                    },
-                    Expression::NonTerminal {
-                        name: String::from("block"),
-                        children: Vec::from([Expression::Terminal {
-                            name: String::from("return_statement"),
-                            value: None,
-                        }]),
-                    },
-                ]),
-            }]),
-        };
+        let expected_sexpr = make_expected_sexpression();
         let diff_strict =
             ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, false);
         let children = assert_partial(&diff_strict, "source_file");
@@ -411,7 +416,17 @@ mod tests {
         let children = assert_partial(&children[4], "block");
         assert_eq!(children.len(), 1);
         assert_nonequal_type(&children[0], "return_statement");
+        Ok(())
+    }
 
+    #[test]
+    fn test_diff_lenient() -> Result<(), TestError<Rule>> {
+        let test_case: TestCase = TestParser::parse(TEXT)
+            .map_err(|source| TestError::Parser { source })
+            .and_then(|pair| {
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+            })?;
+        let expected_sexpr = make_expected_sexpression();
         let diff_lenient =
             ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, true);
         let children = assert_partial(&diff_lenient, "source_file");
@@ -420,7 +435,80 @@ mod tests {
         Ok(())
     }
 
-    // fn test_format() -> Result<(), TestError<Rule>> {
-    //     Ok(())
-    // }
+    #[test]
+    fn test_format_nocolor() -> Result<(), TestError<Rule>> {
+        let test_case: TestCase = TestParser::parse(TEXT)
+            .map_err(|source| TestError::Parser { source })
+            .and_then(|pair| {
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+            })?;
+        let expected_sexpr = make_expected_sexpression();
+        let diff = ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, false);
+        let mut writer = String::new();
+        let mut formatter = ExpressionFormatter::from_defaults(&mut writer);
+        formatter.fmt_diff(&diff, None, None).ok();
+        let expected = indoc! {r#"
+            (source_file
+              (function_definition
+                (identifier: "y")
+                (identifier: "x")
+                (missing
+                  (foo)
+                )
+                (parameter_list)
+                (primitive_type)
+                (primitive_type: "int")
+                (block
+                  (return_statement)
+                  (return_statement
+                    (number: "1")
+                  )
+                )
+              )
+            )"#};
+        assert_eq!(writer, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn test_format_color() -> Result<(), TestError<Rule>> {
+        let test_case: TestCase = TestParser::parse(TEXT)
+            .map_err(|source| TestError::Parser { source })
+            .and_then(|pair| {
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+            })?;
+        let expected_sexpr = make_expected_sexpression();
+        let diff = ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, false);
+        let mut writer = String::new();
+        let mut formatter = ExpressionFormatter::from_defaults(&mut writer);
+        formatter
+            .fmt_diff(&diff, Some(Color::Green), Some(Color::Red))
+            .ok();
+        let expected = format!(
+            indoc! {r#"
+        (source_file
+          (function_definition
+        {green_start}    (identifier: "y"){end}
+        {red_start}    (identifier: "x"){end}
+        {green_start}    (missing
+              (foo)
+            ){end}
+        {red_start}    (parameter_list){end}
+        {green_start}    (primitive_type){end}
+        {red_start}    (primitive_type: "int"){end}
+            (block
+        {green_start}      (return_statement){end}
+        {red_start}      (return_statement
+                (number: "1")
+              ){end}
+            )
+          )
+        )"#},
+            green_start = "\u{1b}[32m",
+            red_start = "\u{1b}[31m",
+            end = "\u{1b}[0m",
+        );
+        assert_eq!(writer, expected);
+        Ok(())
+    }
 }

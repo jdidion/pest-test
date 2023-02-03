@@ -115,6 +115,7 @@ pub struct ExpressionFormatter<'a> {
     indent: &'a str,
     pub(crate) level: usize,
     pub(crate) color: Option<Color>,
+    buffering: bool,
 }
 
 impl<'a> ExpressionFormatter<'a> {
@@ -124,6 +125,7 @@ impl<'a> ExpressionFormatter<'a> {
             indent: "  ",
             level: 0,
             color: None,
+            buffering: true,
         }
     }
 
@@ -134,25 +136,43 @@ impl<'a> ExpressionFormatter<'a> {
         Ok(())
     }
 
-    pub(crate) fn write_char(&mut self, c: char) -> FmtResult {
-        match self.color {
-            Some(color) => self.writer.write_str(c.to_string().color(color).as_ref()),
-            None => self.writer.write_char(c),
-        }
-    }
-
     pub(crate) fn write_newline(&mut self) -> FmtResult {
         self.writer.write_char('\n')
     }
 
+    pub(crate) fn write_char(&mut self, c: char) -> FmtResult {
+        match self.color {
+            Some(color) => self
+                .writer
+                .write_str(format!("{}", c.to_string().color(color)).as_ref()),
+            None => self.writer.write_char(c),
+        }
+    }
+
     pub(crate) fn write_str(&mut self, s: &str) -> FmtResult {
         match self.color {
-            Some(color) => self.writer.write_str(s.color(color).as_ref()),
+            Some(color) => self
+                .writer
+                .write_str(format!("{}", s.color(color)).as_ref()),
             None => self.writer.write_str(s),
         }
     }
 
-    pub fn fmt(&mut self, expression: &Expression) -> FmtResult {
+    fn fmt_buffered(&mut self, expression: &Expression) -> FmtResult {
+        let mut buf = String::with_capacity(1024);
+        let mut string_formatter = ExpressionFormatter {
+            writer: &mut buf,
+            indent: self.indent,
+            level: self.level,
+            color: None,
+            buffering: false,
+        };
+        string_formatter.fmt(expression)?;
+        self.write_str(buf.as_ref())?;
+        Ok(())
+    }
+
+    fn fmt_unbuffered(&mut self, expression: &Expression) -> FmtResult {
         self.write_indent()?;
         self.write_char('(')?;
         match expression {
@@ -183,6 +203,14 @@ impl<'a> ExpressionFormatter<'a> {
             }
         }
         Ok(())
+    }
+
+    pub fn fmt(&mut self, expression: &Expression) -> FmtResult {
+        if self.buffering {
+            self.fmt_buffered(expression)
+        } else {
+            self.fmt_unbuffered(expression)
+        }
     }
 }
 
