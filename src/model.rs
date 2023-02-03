@@ -1,7 +1,10 @@
 use crate::parser::Rule;
 use colored::{Color, Colorize};
 use pest::{iterators::Pair, RuleType};
-use std::fmt::{Display, Result as FmtResult, Write};
+use std::{
+    collections::HashSet,
+    fmt::{Display, Result as FmtResult, Write},
+};
 
 #[derive(Debug)]
 pub struct ModelError(String);
@@ -42,9 +45,7 @@ impl Expression {
             Self::NonTerminal { name, children: _ } => name,
         }
     }
-}
 
-impl Expression {
     pub fn try_from_sexpr<'a>(pair: Pair<'a, Rule>) -> Result<Self, ModelError> {
         let mut inner = pair.into_inner();
         let name = inner
@@ -82,12 +83,16 @@ impl Expression {
         }
     }
 
-    pub fn try_from_code<'a, R: RuleType>(pair: Pair<'a, R>) -> Result<Self, ModelError> {
+    pub fn try_from_code<'a, R: RuleType>(
+        pair: Pair<'a, R>,
+        skip_rules: &HashSet<R>,
+    ) -> Result<Self, ModelError> {
         let name = format!("{:?}", pair.as_rule());
         let value = pair.as_str();
         let children: Result<Vec<Expression>, ModelError> = pair
             .into_inner()
-            .map(|pair| Self::try_from_code(pair))
+            .filter(|pair| !skip_rules.contains(&pair.as_rule()))
+            .map(|pair| Self::try_from_code(pair, skip_rules))
             .collect();
         match children {
             Ok(children) if children.is_empty() => Ok(Self::Terminal {
@@ -227,6 +232,8 @@ impl TestCase {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::{Expression, TestCase};
     use crate::{
         parser::{Rule, TestParser},
@@ -234,9 +241,34 @@ mod tests {
     };
     use indoc::indoc;
 
+    const TEXT: &str = indoc! {r#"
+    My Test
+
+    =======
+
+    fn x() int {
+      return 1;
+    }
+
+    =======
+    
+    (source_file
+      (function_definition
+        (identifier: "x")
+        (parameter_list)
+        (primitive_type: "int")
+        (block
+          (return_statement 
+            (number: "1")
+          )
+        )
+      )
+    )
+    "#};
+
     fn assert_nonterminal<'a>(
         expression: &'a Expression,
-        expected_name: &'a str,
+        expected_name: &str,
     ) -> &'a Vec<Expression> {
         match expression {
             Expression::NonTerminal { name, children } => {
@@ -252,7 +284,7 @@ mod tests {
             Expression::Terminal { name, value } => {
                 assert_eq!(name, expected_name);
                 match (value, expected_value) {
-                    (Some(actual), Some(expected)) => assert_eq!(actual, expected),
+                    (Some(actual), Some(expected)) => assert_eq!(actual.trim(), expected),
                     (Some(actual), None) => {
                         panic!("Terminal node has value {actual} but there is no expected value")
                     }
@@ -266,33 +298,35 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_parse_into() -> Result<(), Error<Rule>> {
-        let text = indoc! {r#"
-        My Test
+    fn assert_nonterminal_sexpr<'a>(
+        expression: &'a Expression,
+        expected_name: &str,
+    ) -> &'a Vec<Expression> {
+        let children = assert_nonterminal(expression, "expression");
+        assert_eq!(children.len(), 2);
+        assert_terminal(&children[0], "rule_name", Some(expected_name));
+        assert_nonterminal(&children[1], "sub_expressions")
+    }
 
-        =======
-  
-        fn x() int {
-          return 1;
+    fn assert_terminal_sexpr(
+        expression: &Expression,
+        expected_name: &str,
+        expected_value: Option<&str>,
+    ) {
+        let children = assert_nonterminal(expression, "expression");
+        assert!(children.len() >= 1);
+        assert_terminal(&children[0], "rule_name", Some(expected_name));
+        if expected_value.is_some() {
+            assert_eq!(children.len(), 2);
+            let value = assert_nonterminal(&children[1], "rule_value_str");
+            assert_eq!(value.len(), 1);
+            assert_terminal(&value[0], "rule_value", expected_value);
         }
-  
-        =======
-        
-        (source_file
-          (function_definition
-            (identifier: "x")
-            (parameter_list)
-            (primitive_type: "int")
-            (block
-              (return_statement 
-                (number: "1")
-              )
-            )
-          )
-        )
-        "#};
-        let test_case: TestCase = TestParser::parse(text)
+    }
+
+    #[test]
+    fn test_parse() -> Result<(), Error<Rule>> {
+        let test_case: TestCase = TestParser::parse(TEXT)
             .map_err(|source| Error::Parser { source })
             .and_then(|pair| {
                 TestCase::try_from_pair(pair).map_err(|source| Error::Model { source })
@@ -312,6 +346,34 @@ mod tests {
         let children = assert_nonterminal(&children[0], "return_statement");
         assert_eq!(children.len(), 1);
         assert_terminal(&children[0], "number", Some("1"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_from_code() -> Result<(), Error<Rule>> {
+        let test_pair = TestParser::parse(TEXT).map_err(|source| Error::Parser { source })?;
+        let skip_rules = HashSet::from([Rule::EOI]);
+        let code_expression = Expression::try_from_code(test_pair, &skip_rules)
+            .map_err(|source| Error::Model { source })?;
+        let children = assert_nonterminal(&code_expression, "test_case");
+        assert_eq!(children.len(), 3);
+        assert_terminal(&children[0], "test_name", Some("My Test"));
+        let code_block = assert_nonterminal(&children[1], "code_block");
+        assert_eq!(code_block.len(), 2);
+        assert_terminal(&code_block[0], "div", Some("======="));
+        assert_terminal(&code_block[1], "code", Some("fn x() int {\n  return 1;\n}"));
+        let s_expression = assert_nonterminal_sexpr(&children[2], "source_file");
+        assert_eq!(s_expression.len(), 1);
+        let s_expression = assert_nonterminal_sexpr(&s_expression[0], "function_definition");
+        assert_eq!(s_expression.len(), 4);
+        assert_terminal_sexpr(&s_expression[0], "identifier", Some("x"));
+        assert_terminal_sexpr(&s_expression[1], "parameter_list", None);
+        assert_terminal_sexpr(&s_expression[2], "primitive_type", Some("int"));
+        let s_expression = assert_nonterminal_sexpr(&s_expression[3], "block");
+        assert_eq!(s_expression.len(), 1);
+        let s_expression = assert_nonterminal_sexpr(&s_expression[0], "return_statement");
+        assert_eq!(s_expression.len(), 1);
+        assert_terminal_sexpr(&s_expression[0], "number", Some("1"));
         Ok(())
     }
 }

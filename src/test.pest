@@ -11,5 +11,5 @@ rule_name = @{ ASCII_ALPHA ~ ( ASCII_ALPHANUMERIC | "_" )* }
 colon = _{ ":" }
 rule_value_str = ${ dquote ~ rule_value ~ dquote }
 dquote = _{ "\"" }
-rule_value = @{ ( "\\\"" | ( !"\"" ~ ANY )  )* }
+rule_value = @{ ( "\\\"" | ( !"\"" ~ ANY ) )* }
 WHITESPACE = _{ (" " | "\t" | NEWLINE )+ }

@@ -3,12 +3,15 @@ pub mod model;
 mod parser;
 
 use crate::{
-    diff::{diff_expressions, ExpressionDiff},
+    diff::ExpressionDiff,
     model::{Expression, ModelError, TestCase},
     parser::{ParserError, Rule, TestParser},
 };
 use pest::{error::Error as PestError, Parser, RuleType};
-use std::{fs::read_to_string, io::Error as IOError, marker::PhantomData, path::PathBuf};
+use std::{
+    collections::HashSet, fs::read_to_string, io::Error as IOError, marker::PhantomData,
+    path::PathBuf,
+};
 
 #[derive(Debug)]
 pub enum Error<R> {
@@ -23,25 +26,32 @@ pub struct PestTester<R: RuleType, P: Parser<R>> {
     test_dir: PathBuf,
     test_ext: String,
     rule: R,
+    skip_rules: HashSet<R>,
     parser: PhantomData<P>,
 }
 
 impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
-    pub fn new<D: Into<PathBuf>, S: AsRef<str>>(test_dir: D, test_ext: S, rule: R) -> Self {
+    pub fn new<D: Into<PathBuf>, S: AsRef<str>>(
+        test_dir: D,
+        test_ext: S,
+        rule: R,
+        skip_rules: HashSet<R>,
+    ) -> Self {
         Self {
             test_dir: test_dir.into(),
             test_ext: test_ext.as_ref().to_owned(),
             rule,
+            skip_rules,
             parser: PhantomData::<P>,
         }
     }
 
-    pub fn from_defaults(rule: R) -> Self {
+    pub fn from_defaults(rule: R, skip_rules: HashSet<R>) -> Self {
         let default_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("tests")
             .join("parser");
         let default_ext = ".txt";
-        Self::new(default_dir, default_ext, rule)
+        Self::new(default_dir, default_ext, rule, skip_rules)
     }
 
     pub fn evaluate<N: AsRef<str>>(
@@ -64,9 +74,9 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
                     ParserError::Pest { source } => Error::Target { source },
                 }
             })?;
-        let code_expr =
-            Expression::try_from_code(code_pair).map_err(|source| Error::Model { source })?;
-        match diff_expressions(
+        let code_expr = Expression::try_from_code(code_pair, &self.skip_rules)
+            .map_err(|source| Error::Model { source })?;
+        match ExpressionDiff::from_expressions(
             &test_case.expression,
             &code_expr,
             ignore_missing_expected_values,
