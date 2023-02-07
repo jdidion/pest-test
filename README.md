@@ -40,7 +40,7 @@ fn x() int {
 
 ## Usage
 
-The main interface to the test framework is `pest_test::PestTester`. By default, tests are assumed to be in the `tests/parser` directory of your crate and have a `.txt` file extension. The example below shows using the `lazy_static` macro to create a single `PestTester` instance and then using it to evaluate any number of tests.
+The main interface to the test framework is `pest_test::PestTester`. By default, tests are assumed to be in the `tests/pest` directory of your crate and have a `.txt` file extension. The example below shows using the `lazy_static` macro to create a single `PestTester` instance and then using it to evaluate any number of tests.
 
 ```rust
 #[cfg(test)]
@@ -54,12 +54,29 @@ mod tests {
       PestTester::from_defaults(Rule::root_rule);
   }
 
-  // Loads test from `tests/parser/mytest.txt` and evaluates it. Returns an `Err<pest_test::Error>`
+  // Loads test from `tests/pest/mytest.txt` and evaluates it. Returns an `Err<pest_test::Error>`
   // if there was an error evaluating the test, or if the expected and actual values do not match.
   fn test_my_parser -> Result<(), Error> {
-    (*tester).evaluate_strict("mytest")
+    (*TESTER).evaluate_strict("mytest")
   }
 }
+```
+
+If you add `pest-test-gen` as a dev dependency, then you can use the `pest_tests` attribute macro to generate tests for all your test cases:
+
+```rust
+// Generate tests for all test cases in tests/pest/foo/ and all subdirectories. Since
+// `lazy_static = true`, a single `PestTester` is created and used by all tests; otherwise a new
+// `PestTester` would be created for each test.
+#[pest_tests(
+  mycrate::parser::MyParser,
+  mycrate::parser::Rule::root_rule,
+  subdir = "foo",
+  recursive = true,
+  lazy_static = true,
+)]
+#[cfg(test)]
+mod foo_tests {}
 ```
 
 ## Details
