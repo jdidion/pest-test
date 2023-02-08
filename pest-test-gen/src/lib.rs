@@ -1,5 +1,4 @@
 use proc_macro::TokenStream;
-//use proc_macro2::{Punct, Span, TokenStream as TokenStream2};
 use proc_macro2::Span;
 use proc_macro_error::{abort, abort_call_site, proc_macro_error};
 use quote::{format_ident, quote, ToTokens};
@@ -8,15 +7,6 @@ use syn::{
     parse_macro_input, AttributeArgs, Ident, Item, ItemMod, Lit, Meta, MetaList, MetaNameValue,
     NestedMeta, Path, PathArguments, PathSegment,
 };
-// use syn::{
-//     parse_macro_input,
-//     punctuated::Punctuated,
-//     token::{Bang, Brace, Colon2, Comma, Dot, Eq, Fn, Gt, Let, Lt, Paren, RArrow, Semi},
-//     AngleBracketedGenericArguments, AttributeArgs, Block, Expr, ExprLet, ExprLit, ExprMethodCall,
-//     ExprPath, GenericArgument, Generics, Ident, Item, ItemFn, ItemMacro, ItemMod, Lit, LitStr,
-//     Macro, MacroDelimiter, Meta, MetaNameValue, NestedMeta, Pat, PatIdent, Path, PathArguments,
-//     PathSegment, ReturnType, Signature, Stmt, Type, TypePath, TypeTuple, Visibility,
-// };
 use walkdir::WalkDir;
 
 struct Args {
@@ -204,20 +194,6 @@ impl Args {
     }
 }
 
-// fn path(path: &[&str], arguments: PathArguments) -> Path {
-//     let mut segments: Punctuated<PathSegment, Colon2> = Punctuated::new();
-//     for seg in path {
-//         segments.push_value(PathSegment {
-//             ident: Ident::new(seg, Span::call_site()),
-//             arguments,
-//         })
-//     }
-//     Path {
-//         leading_colon: None,
-//         segments,
-//     }
-// }
-
 fn rule_variant(rule_path: &Path, variant_ident: Ident) -> Path {
     let mut path = rule_path.clone();
     path.segments.push(PathSegment {
@@ -248,21 +224,6 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
     }
 
     if args.lazy_static {
-        // let tokens = quote! {
-        //     static ref TESTER: pest_test::PestTester<#rule_path, #parser_path> =
-        //         PestTester::from_defaults(#rule_path::#rule_ident);
-        // };
-        // content.push(Item::Macro(ItemMacro {
-        //     attrs: Vec::default(),
-        //     ident: None,
-        //     mac: Macro {
-        //         path: path(&["lazy_static", "lazy_static"], PathArguments::None),
-        //         bang_token: Bang::default(),
-        //         delimiter: MacroDelimiter::Brace(Brace::default()),
-        //         tokens,
-        //     },
-        //     semi_token: None,
-        // }));
         let lazy_static_tokens = quote! {
             lazy_static::lazy_static! {
                 static ref COLORIZE: bool = {
@@ -323,91 +284,6 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
             }
         };
         content.push(item);
-        // let result_generics: Punctuated<GenericArgument, Comma> = Punctuated::new();
-        // result_generics.push(GenericArgument::Type(Type::Tuple(TypeTuple {
-        //     paren_token: Paren::default(),
-        //     elems: Punctuated::new(),
-        // })));
-        // result_generics.push(GenericArgument::Type(Type::Path(TypePath {
-        //     qself: None,
-        //     path: path(&["pest_test", "TestError"], PathArguments::None),
-        // })));
-        // let sig = Signature {
-        //     constness: None,
-        //     asyncness: None,
-        //     unsafety: None,
-        //     abi: None,
-        //     fn_token: Fn::default(),
-        //     ident: Ident::new(format!("test_{}", test_name).as_ref(), Span::call_site()),
-        //     generics: Generics::default(),
-        //     paren_token: Paren::default(),
-        //     inputs: Punctuated::new(),
-        //     variadic: None,
-        //     output: ReturnType::Type(
-        //         RArrow::default(),
-        //         Box::new(Type::Path(TypePath {
-        //             qself: None,
-        //             path: path(
-        //                 &["core", "result", "Result"],
-        //                 PathArguments::AngleBracketed(AngleBracketedGenericArguments {
-        //                     colon2_token: None,
-        //                     lt_token: Lt::default(),
-        //                     args: result_generics,
-        //                     gt_token: Gt::default(),
-        //                 }),
-        //             ),
-        //         })),
-        //     ),
-        // };
-        // let rhs = if args.lazy_static {
-        //     // (*PEST_TESTER)
-        // } else {
-        //     // PestTester::new()
-        // };
-        // let args: Punctuated<Expr, Comma> = Punctuated::new();
-        // args.push(Expr::Lit(ExprLit {
-        //     attrs: Vec::default(),
-        //     lit: Lit::Str(LitStr::new(test_name.as_ref(), Span::call_site())),
-        // }));
-        // content.push(Item::Fn(ItemFn {
-        //     attrs: Vec::default(),
-        //     vis: Visibility::Inherited,
-        //     sig,
-        //     block: Box::new(Block {
-        //         brace_token: Brace::default(),
-        //         stmts: vec![
-        //             Stmt::Semi(
-        //                 Expr::Let(ExprLet {
-        //                     attrs: Vec::default(),
-        //                     let_token: Let::default(),
-        //                     pat: Pat::Ident(PatIdent {
-        //                         attrs: Vec::default(),
-        //                         by_ref: None,
-        //                         mutability: None,
-        //                         ident: Ident::new("tester", Span::call_site()),
-        //                         subpat: None,
-        //                     }),
-        //                     eq_token: Eq::default(),
-        //                     expr: Box::new(rhs),
-        //                 }),
-        //                 Semi::default(),
-        //             ),
-        //             Stmt::Expr(Expr::MethodCall(ExprMethodCall {
-        //                 attrs: Vec::default(),
-        //                 receiver: Box::new(Expr::Path(ExprPath {
-        //                     attrs: Vec::default(),
-        //                     qself: None,
-        //                     path: path(&[test_name.as_ref()], PathArguments::None),
-        //                 })),
-        //                 dot_token: Dot::default(),
-        //                 method: Ident::new("evaluate_strict", Span::call_site()),
-        //                 turbofish: None,
-        //                 paren_token: Paren::default(),
-        //                 args,
-        //             })),
-        //         ],
-        //     }),
-        // }))
     }
 }
 
