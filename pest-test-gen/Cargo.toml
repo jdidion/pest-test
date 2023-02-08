@@ -13,7 +13,7 @@ license = "MIT"
 proc-macro = true
 
 [dependencies]
-pest-test = { version = "0.1.0", path = "../pest-test" }
+pest-test = { version = "0.1.0" } #, path = "../pest-test" }
 syn = { version = "*", features = ["full"] }
 quote = "*"
 proc-macro2 = "*"
