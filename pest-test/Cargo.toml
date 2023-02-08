@@ -8,6 +8,7 @@ categories = ["parsing"]
 repository = "https://github.com/jdidion/pest-test"
 edition = "2021"
 license = "MIT"
+readme = "../README.md"
 
 [dependencies]
 colored = "2.0.0"
