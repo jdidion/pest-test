@@ -265,6 +265,9 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
         // }));
         let lazy_static_tokens = quote! {
             lazy_static::lazy_static! {
+                static ref COLORIZE: bool = {
+                    option_env!("CARGO_TERM_COLOR").unwrap_or("always") != "never"
+                };
                 static ref TESTER: pest_test::PestTester<#rule_path, #parser_path> =
                     pest_test::PestTester::new(
                         #test_dir,
@@ -289,8 +292,7 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
                 fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
                     let res = (*TESTER).evaluate_strict(#test_name);
                     if let Err(pest_test::TestError::Diff { ref diff }) = res {
-                        // TODO: detect value of --color option to cargo-test
-                        diff.print_test_result(true).unwrap();
+                        diff.print_test_result(*COLORIZE).unwrap();
                     }
                     res
                 }
@@ -307,8 +309,8 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
                     );
                     let res = tester.evaluate_strict(#test_name);
                     if let Err(pest_test::TestError::Diff { ref diff }) = res {
-                        // TODO: detect value of --color option to cargo-test
-                        diff.print_test_result(true).unwrap();
+                        let colorize = option_env!("CARGO_TERM_COLOR").unwrap_or("always") != "never";
+                        diff.print_test_result(colorize).unwrap();
                     }
                     res
                 }

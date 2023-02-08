@@ -80,6 +80,8 @@ If you add `pest-test-gen` as a dev dependency, then you can use the `pest_tests
 mod foo_tests {}
 ```
 
+To disable colorization of the diff output, run cargo with `CARGO_TERM_COLOR=never`.
+
 Note that a test module is only recompiled when its code changes. Thus, if you add or rename a test case in `tests/pest` without changing the test module, the test module might not get updated to include the new/renamed tests, so you may need to delete the `target` folder to force your tests to be recompiled.
 
 ## Details

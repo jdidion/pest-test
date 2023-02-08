@@ -11,7 +11,7 @@ fn x() int {
 (source_file
   (function_definition
     (identifier: "x")
-    (parameter_list)
+    (parameter_list: "1")
     (primitive_type: "int")
     (block
       (return_statement 
