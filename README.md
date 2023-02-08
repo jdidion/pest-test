@@ -80,6 +80,8 @@ If you add `pest-test-gen` as a dev dependency, then you can use the `pest_tests
 mod foo_tests {}
 ```
 
+Note that a test module is only recompiled when its code changes. Thus, if you add or rename a test case in `tests/pest` without changing the test module, the test module might not get updated to include the new/renamed tests, so you may need to delete the `target` folder to force your tests to be recompiled.
+
 ## Details
 
 Test files are parsed using pest. The source code is parsed using your pest grammar, and the resulting tree is iterated exhaustively to build up a nested data structure, which is then matched to the same structure built from the expected output. If they don't match, the tree is printed with the differences in-line.

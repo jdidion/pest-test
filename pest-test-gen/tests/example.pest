@@ -1,0 +1,17 @@
+source_file = { SOI ~ function_definition ~ EOI }
+function_definition = { fn_kw ~ identifier ~ lparen ~ parameter_list ~ rparen ~ primitive_type ~ block }
+fn_kw = _{ "fn" }
+identifier = @{ ASCII_ALPHA ~ ( ASCII_ALPHANUMERIC | "_" )* }
+lparen = _{ "(" }
+rparen = _{ ")" }
+parameter_list = { ( number ~ comma )* ~ number? }
+comma = _{ "," }
+primitive_type = { "int" }
+block = { lbrace ~ return_statement ~ rbrace }
+lbrace = _{ "{" }
+rbrace = _{ "}" }
+return_statement = { return_kw ~ number ~ semi }
+return_kw = _{ "return" }
+number = @{ ASCII_DIGIT+ }
+semi = _{ ";" }
+WHITESPACE = _{ ( " " | "\t" | NEWLINE )+ }

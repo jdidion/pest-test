@@ -1,0 +1,27 @@
+[package]
+name = "pest-test-gen"
+description = "Macro for generating tests from pest-test test cases"
+authors = ["John Didion <github@didion.net>"]
+version = "0.1.0"
+keywords = ["parsing", "pest", "macro"]
+categories = ["parsing"]
+repository = "https://github.com/jdidion/pest-test"
+edition = "2021"
+license = "MIT"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+pest-test = { version = "0.1.0", path = "../pest-test" }
+syn = { version = "*", features = ["full"] }
+quote = "*"
+proc-macro2 = "*"
+proc-macro-error = "1.0.4"
+walkdir = "2.3.2"
+
+[dev-dependencies]
+indoc = "2.0.0"
+lazy_static = "1.4.0"
+pest = "2.5.2"
+pest_derive = "2.5.2"

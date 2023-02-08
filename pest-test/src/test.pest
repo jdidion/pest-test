@@ -1,0 +1,15 @@
+test_case = { SOI ~ test_name ~ code_block ~ expression ~ EOI }
+test_name = @{ ( !NEWLINE ~ ANY )+ }
+code_block = { PUSH(div) ~ code ~ POP }
+div = @{ ( !NEWLINE ~ ANY ){3,} }
+code = @{ ( !PEEK ~ ANY )* }
+expression = { lparen ~ rule_name ~ ( sub_expressions | ( colon ~ rule_value_str ) )? ~ rparen }
+sub_expressions = { expression+ }
+lparen = _{ "(" }
+rparen = _{ ")" }
+rule_name = @{ ASCII_ALPHA ~ ( ASCII_ALPHANUMERIC | "_" )* }
+colon = _{ ":" }
+rule_value_str = ${ dquote ~ rule_value ~ dquote }
+dquote = _{ "\"" }
+rule_value = @{ ( "\\\"" | ( !"\"" ~ ANY ) )* }
+WHITESPACE = _{ ( " " | "\t" | NEWLINE )+ }
