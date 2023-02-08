@@ -45,9 +45,9 @@ The main interface to the test framework is `pest_test::PestTester`. By default,
 ```rust
 #[cfg(test)]
 mod tests {
+  use mycrate::parser::{MyParser, Rule};
   use lazy_static::lazy_static;
   use pest_test::{Error, PestTester};
-  use myparser::{MyParser, Rule};
 
   lazy_static! {
     static ref TESTER: PestTester<Rule, MyParser> = 
@@ -70,7 +70,8 @@ If you add `pest-test-gen` as a dev dependency, then you can use the `pest_tests
 // `PestTester` would be created for each test.
 #[pest_tests(
   mycrate::parser::MyParser,
-  mycrate::parser::Rule::root_rule,
+  mycrate::parser::Rule,
+  "root_rule",
   subdir = "foo",
   recursive = true,
   lazy_static = true,
