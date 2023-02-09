@@ -28,6 +28,10 @@ fn assert_rule<'a>(pair: Pair<'a, Rule>, rule: Rule) -> Result<Pair<'a, Rule>, M
     }
 }
 
+fn unescape(s: String) -> String {
+    s.replace("\\\"", "\"")
+}
+
 #[derive(Clone, Debug)]
 pub enum Expression {
     Terminal {
@@ -87,7 +91,7 @@ impl Expression {
                         .map(|pair| assert_rule(pair, Rule::string_value))
                         .transpose()
                         .map(|opt| {
-                            opt.map(|pair| pair.as_str().to_owned())
+                            opt.map(|pair| unescape(pair.as_str().to_owned()))
                                 .or_else(|| Some(String::new()))
                         })?;
                     Self::Terminal { name, value }
@@ -399,6 +403,39 @@ mod tests {
             assert_eq!(value.len(), 1);
             assert_terminal(&value[0], "string_value", expected_value);
         }
+    }
+
+    const WITH_QUOTE: &str = indoc! {r#"
+    Quoted
+    ======
+
+    x = "hi"
+    
+    ======
+
+    (source_file
+        (declaration
+            (identifier: "x")
+            (value: "\"hi\"")
+        )
+    )
+    "#};
+
+    #[test]
+    fn test_quoted_value() -> Result<(), TestError<Rule>> {
+        let test_case: TestCase = TestParser::parse(WITH_QUOTE)
+            .map_err(|source| TestError::Parser { source })
+            .and_then(|pair| {
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+            })?;
+        let expression = test_case.expression;
+        let children = assert_nonterminal(&expression, "source_file");
+        assert_eq!(children.len(), 1);
+        let children = assert_nonterminal(&children[0], "declaration");
+        assert_eq!(children.len(), 2);
+        assert_terminal(&children[0], "identifier", Some("x"));
+        assert_terminal(&children[1], "value", Some("\"hi\""));
+        Ok(())
     }
 
     const TEXT: &str = indoc! {r#"
