@@ -49,9 +49,7 @@ impl Args {
             rule_path,
             rule_ident,
             skip_rules: Vec::new(),
-            dir: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("tests")
-                .join("pest"),
+            dir: pest_test::default_test_dir(),
             subdir: None,
             ext: String::from("txt"),
             recursive: false,

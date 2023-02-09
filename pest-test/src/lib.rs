@@ -14,6 +14,12 @@ use std::{
 };
 use thiserror::Error;
 
+pub fn default_test_dir() -> PathBuf {
+    PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap().as_str())
+        .join("tests")
+        .join("pest")
+}
+
 #[derive(Error, Debug)]
 pub enum TestError<R> {
     #[error("Error reading test case from file")]
@@ -59,11 +65,7 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
     /// file extension ".txt". Code is parsed beinning at `rule` and the rules in `skip_rule` are
     /// ignored when comparing to the expected expression.
     pub fn from_defaults(rule: R, skip_rules: HashSet<R>) -> Self {
-        let default_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join("pest");
-        let default_ext = ".txt";
-        Self::new(default_dir, default_ext, rule, skip_rules)
+        Self::new(default_test_dir(), ".txt", rule, skip_rules)
     }
 
     /// Evaluates the test with the given name. If `ignore_missing_expected_values` is true, then
