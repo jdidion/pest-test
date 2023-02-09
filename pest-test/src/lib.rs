@@ -14,10 +14,12 @@ use std::{
 };
 use thiserror::Error;
 
-pub fn default_test_dir() -> PathBuf {
+pub fn cargo_manifest_dir() -> PathBuf {
     PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap().as_str())
-        .join("tests")
-        .join("pest")
+}
+
+pub fn default_test_dir() -> PathBuf {
+    cargo_manifest_dir().join("tests").join("pest")
 }
 
 #[derive(Error, Debug)]

@@ -77,7 +77,7 @@ impl Args {
                                 _ => abort!(lit, "Invalid argument to 'dir' attribute"),
                             };
                             if path.is_relative() {
-                                path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(path)
+                                path = PathBuf::from(pest_test::cargo_manifest_dir()).join(path)
                             }
                             args.dir = path
                         }

@@ -2,7 +2,7 @@
 name = "pest-test-gen"
 description = "Macro for generating tests from pest-test test cases"
 authors = ["John Didion <github@didion.net>"]
-version = "0.1.4"
+version = "0.1.5"
 keywords = ["parsing", "pest", "macro"]
 categories = ["parsing"]
 repository = "https://github.com/jdidion/pest-test"
@@ -13,7 +13,7 @@ license = "MIT"
 proc-macro = true
 
 [dependencies]
-pest-test = { version = "0.1.3", path = "../pest-test" }
+pest-test = { version = "0.1.4", path = "../pest-test" }
 proc-macro2 = "1.0.51"
 syn = { version = "1.0.107", features = ["full"] }
 quote = "1.0.23"
