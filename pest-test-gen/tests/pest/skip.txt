@@ -1,12 +1,11 @@
-My Test
-
-=======
+Node Skipping
+=============
 
 fn x() int {
     return 1;
 }
 
-=======
+=============
 
 (source_file
   (function_definition
@@ -14,10 +13,9 @@ fn x() int {
     (parameter_list)
     (primitive_type: "int")
     (block
-      (inner_block
-        (return_statement 
-          (number: "1")
-        )
+      #[skip(depth = 1)]
+      (return_statement 
+        (number: "1")
       )
     )
   )

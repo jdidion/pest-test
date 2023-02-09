@@ -37,7 +37,7 @@ impl ExpressionDiff {
                     value: actual_value,
                 },
             ) if expected_name == actual_name && expected_value == actual_value => {
-                ExpressionDiff::Equal(expected.clone())
+                ExpressionDiff::Equal(actual.clone())
             }
             (
                 Expression::Terminal {
@@ -71,7 +71,12 @@ impl ExpressionDiff {
                 loop {
                     if let Some(expected_child) = expected_iter.next() {
                         match actual_iter.next() {
-                            Some(actual_child) if expected_child.name() == actual_child.name() => {
+                            Some(actual_child)
+                                if Some(expected_child.name())
+                                    == actual_child
+                                        .get_descendant(expected_child.skip_depth())
+                                        .map(|e| e.name()) =>
+                            {
                                 children.push(Self::from_expressions(
                                     expected_child,
                                     actual_child,
@@ -130,6 +135,17 @@ impl ExpressionDiff {
                     })
                 }
             }
+            (Expression::Skip { depth, next }, actual) => match actual.get_descendant(*depth) {
+                Some(descendant) => Self::from_expressions(
+                    next.as_ref(),
+                    descendant,
+                    ignore_missing_expected_values,
+                ),
+                None => ExpressionDiff::NotEqual {
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                },
+            },
             _ => ExpressionDiff::NotEqual {
                 expected: expected.clone(),
                 actual: actual.clone(),
@@ -269,7 +285,6 @@ mod tests {
 
     const TEXT: &str = indoc! {r#"
     My Test
-
     =======
 
     fn x() int {
@@ -292,7 +307,21 @@ mod tests {
     )
     "#};
 
-    fn make_expected_sexpression() -> Expression {
+    fn make_expected_sexpression(with_skip: bool) -> Expression {
+        let block_children = if with_skip {
+            Vec::from([Expression::Skip {
+                depth: 1,
+                next: Box::new(Expression::Terminal {
+                    name: String::from("number"),
+                    value: Some(String::from("1")),
+                }),
+            }])
+        } else {
+            Vec::from([Expression::Terminal {
+                name: String::from("return_statement"),
+                value: None,
+            }])
+        };
         Expression::NonTerminal {
             name: String::from("source_file"),
             children: Vec::from([Expression::NonTerminal {
@@ -315,13 +344,20 @@ mod tests {
                     },
                     Expression::NonTerminal {
                         name: String::from("block"),
-                        children: Vec::from([Expression::Terminal {
-                            name: String::from("return_statement"),
-                            value: None,
-                        }]),
+                        children: block_children,
                     },
                 ]),
             }]),
+        }
+    }
+
+    fn assert_equal<'a>(diff: &'a ExpressionDiff, expected_name: &'a str) -> &'a Expression {
+        match diff {
+            ExpressionDiff::Equal(expr) => {
+                assert_eq!(expr.name(), expected_name);
+                expr
+            }
+            _ => panic!("Expected diff to be equal but was {}", diff),
         }
     }
 
@@ -443,7 +479,7 @@ mod tests {
             .and_then(|pair| {
                 TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
             })?;
-        let expected_sexpr = make_expected_sexpression();
+        let expected_sexpr = make_expected_sexpression(false);
         let diff_strict =
             ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, false);
         let children = assert_partial(&diff_strict, "source_file");
@@ -467,12 +503,29 @@ mod tests {
             .and_then(|pair| {
                 TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
             })?;
-        let expected_sexpr = make_expected_sexpression();
+        let expected_sexpr = make_expected_sexpression(false);
         let diff_lenient =
             ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, true);
         let children = assert_partial(&diff_lenient, "source_file");
         let children = assert_partial(&children[0], "function_definition");
         assert_value_equal(&children[3], "primitive_type", Some("int"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_diff_with_skip() -> Result<(), TestError<Rule>> {
+        let test_case: TestCase = TestParser::parse(TEXT)
+            .map_err(|source| TestError::Parser { source })
+            .and_then(|pair| {
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+            })?;
+        let expected_sexpr = make_expected_sexpression(true);
+        let diff_lenient =
+            ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, true);
+        let children = assert_partial(&diff_lenient, "source_file");
+        let children = assert_partial(&children[0], "function_definition");
+        assert_value_equal(&children[3], "primitive_type", Some("int"));
+        assert_equal(&children[4], "block");
         Ok(())
     }
 
@@ -483,7 +536,7 @@ mod tests {
             .and_then(|pair| {
                 TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
             })?;
-        let expected_sexpr = make_expected_sexpression();
+        let expected_sexpr = make_expected_sexpression(false);
         let diff = ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, false);
         let mut writer = String::new();
         let mut formatter = ExpressionFormatter::from_defaults(&mut writer);
@@ -518,7 +571,7 @@ mod tests {
             .and_then(|pair| {
                 TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
             })?;
-        let expected_sexpr = make_expected_sexpression();
+        let expected_sexpr = make_expected_sexpression(false);
         let diff = ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, false);
         let mut writer = String::new();
         let mut formatter = ExpressionFormatter::from_defaults(&mut writer);

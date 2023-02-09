@@ -38,6 +38,21 @@ fn x() int {
 
 ```
 
+### Attributes
+
+Nodes in the expected output S-expression may be annotated with attributes of the form `#[name(args)]`. The currently recognized attributes are:
+
+* `skip`: For some grammars, there are multiple levels of nesting that are only necessary to work around the limitations of PEG parsers, e.g. mathematical expressions with left-recursion. To simplify test cases involving such grammars, the `skip` attribute can be used to ignore a specified number of levels of nesting in the actual parse tree.
+  ```
+  (expression
+    #[skip(depth = 3)]
+    (sum
+      (number: 1)
+      (number: 2)
+    )
+  )
+  ```
+
 ## Usage
 
 The main interface to the test framework is `pest_test::PestTester`. By default, tests are assumed to be in the `tests/pest` directory of your crate and have a `.txt` file extension. The example below shows using the `lazy_static` macro to create a single `PestTester` instance and then using it to evaluate any number of tests.

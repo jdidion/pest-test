@@ -38,50 +38,70 @@ pub enum Expression {
         name: String,
         children: Vec<Expression>,
     },
+    Skip {
+        depth: usize,
+        next: Box<Expression>,
+    },
 }
 
 impl Expression {
-    pub fn name(&self) -> &String {
-        match self {
-            Self::Terminal { name, value: _ } => name,
-            Self::NonTerminal { name, children: _ } => name,
-        }
-    }
-
     pub fn try_from_sexpr<'a>(pair: Pair<'a, Rule>) -> Result<Self, ModelError> {
         let mut inner = pair.into_inner();
+        let skip_depth: usize = if inner.peek().map(|pair| pair.as_rule()) == Some(Rule::skip) {
+            let depth_pair = inner
+                .next()
+                .unwrap()
+                .into_inner()
+                .next()
+                .ok_or_else(|| ModelError::from_str("Missing skip depth"))
+                .and_then(|pair| assert_rule(pair, Rule::int))?;
+            depth_pair
+                .as_str()
+                .parse()
+                .map_err(|err| ModelError(format!("Error parsing skip depth: {:?}", err)))?
+        } else {
+            0
+        };
         let name = inner
             .next()
             .ok_or_else(|| ModelError::from_str("Missing rule name"))
-            .and_then(|pair| assert_rule(pair, Rule::rule_name))
+            .and_then(|pair| assert_rule(pair, Rule::identifier))
             .map(|pair| pair.as_str().to_owned())?;
-        match inner.next() {
-            None => Ok(Self::Terminal { name, value: None }),
+        let expr = match inner.next() {
+            None => Self::Terminal { name, value: None },
             Some(pair) => match pair.as_rule() {
                 Rule::sub_expressions => {
                     let children: Result<Vec<Expression>, ModelError> = pair
                         .into_inner()
                         .map(|pair| Self::try_from_sexpr(pair))
                         .collect();
-                    Ok(Self::NonTerminal {
+                    Self::NonTerminal {
                         name,
                         children: children?,
-                    })
+                    }
                 }
-                Rule::rule_value_str => {
+                Rule::string => {
                     let value = pair
                         .into_inner()
                         .next()
-                        .map(|pair| assert_rule(pair, Rule::rule_value))
+                        .map(|pair| assert_rule(pair, Rule::string_value))
                         .transpose()
                         .map(|opt| {
                             opt.map(|pair| pair.as_str().to_owned())
                                 .or_else(|| Some(String::new()))
                         })?;
-                    Ok(Self::Terminal { name, value })
+                    Self::Terminal { name, value }
                 }
-                other => Err(ModelError(format!("Unexpected rule {:?}", other))),
+                other => return Err(ModelError(format!("Unexpected rule {:?}", other))),
             },
+        };
+        if skip_depth == 0 {
+            Ok(expr)
+        } else {
+            Ok(Self::Skip {
+                depth: skip_depth,
+                next: Box::new(expr),
+            })
         }
     }
 
@@ -106,6 +126,41 @@ impl Expression {
                 children: children,
             }),
             Err(e) => Err(e),
+        }
+    }
+
+    pub fn name(&self) -> &String {
+        match self {
+            Self::Terminal { name, value: _ } => name,
+            Self::NonTerminal { name, children: _ } => name,
+            Self::Skip { depth: _, next } => next.name(),
+        }
+    }
+
+    pub fn skip_depth(&self) -> usize {
+        match self {
+            Expression::Skip { depth, next: _ } => *depth,
+            _ => 0,
+        }
+    }
+
+    /// Returns the `Nth` descendant of this expression, where `N = depth`. For a
+    /// `NonTerminal` expression, the descendant is its first child. For a `Terminal` node, there
+    /// is no descendant.
+    pub fn get_descendant(&self, depth: usize) -> Option<&Expression> {
+        if depth > 0 {
+            match self {
+                Self::NonTerminal { name: _, children } if !children.is_empty() => {
+                    children.first().unwrap().get_descendant(depth - 1)
+                }
+                Self::Skip {
+                    depth: skip_depth,
+                    next,
+                } if *skip_depth <= depth => next.as_ref().get_descendant(depth - skip_depth),
+                _ => None,
+            }
+        } else {
+            Some(self)
         }
     }
 }
@@ -174,9 +229,9 @@ impl<'a> ExpressionFormatter<'a> {
 
     fn fmt_unbuffered(&mut self, expression: &Expression) -> FmtResult {
         self.write_indent()?;
-        self.write_char('(')?;
         match expression {
             Expression::Terminal { name, value } => {
+                self.write_char('(')?;
                 self.write_str(name)?;
                 if let Some(value) = value {
                     self.write_str(": \"")?;
@@ -186,10 +241,12 @@ impl<'a> ExpressionFormatter<'a> {
                 self.write_char(')')?;
             }
             Expression::NonTerminal { name, children } if children.is_empty() => {
+                self.write_char('(')?;
                 self.write_str(name)?;
                 self.write_char(')')?;
             }
             Expression::NonTerminal { name, children } => {
+                self.write_char('(')?;
                 self.write_str(name)?;
                 self.write_newline()?;
                 self.level += 1;
@@ -200,6 +257,11 @@ impl<'a> ExpressionFormatter<'a> {
                 self.level -= 1;
                 self.write_indent()?;
                 self.write_char(')')?;
+            }
+            Expression::Skip { depth, next } => {
+                self.write_str(format!("#[skip(depth = {})]", depth).as_ref())?;
+                self.write_newline()?;
+                self.fmt_unbuffered(next.as_ref())?;
             }
         }
         Ok(())
@@ -271,6 +333,74 @@ mod tests {
     use indoc::indoc;
     use std::collections::HashSet;
 
+    fn assert_nonterminal<'a>(
+        expression: &'a Expression,
+        expected_name: &str,
+    ) -> &'a Vec<Expression> {
+        match expression {
+            Expression::NonTerminal { name, children } => {
+                assert_eq!(name, expected_name);
+                children
+            }
+            _ => panic!("Expected non-terminal expression but found {expression:?}"),
+        }
+    }
+
+    fn assert_skip<'a>(expression: &'a Expression, expected_depth: usize) -> &'a Box<Expression> {
+        match expression {
+            Expression::Skip { depth, next } => {
+                assert_eq!(expected_depth, *depth);
+                next
+            }
+            _ => panic!("Expected skip expression but found {expression:?}"),
+        }
+    }
+
+    fn assert_terminal(expression: &Expression, expected_name: &str, expected_value: Option<&str>) {
+        match expression {
+            Expression::Terminal { name, value } => {
+                assert_eq!(name, expected_name);
+                match (value, expected_value) {
+                    (Some(actual), Some(expected)) => assert_eq!(actual.trim(), expected),
+                    (Some(actual), None) => {
+                        panic!("Terminal node has value {actual} but there is no expected value")
+                    }
+                    (None, Some(expected)) => {
+                        panic!("Terminal node has no value but expected {expected}")
+                    }
+                    _ => (),
+                }
+            }
+            _ => panic!("Expected terminal expression but found {expression:?}"),
+        }
+    }
+
+    fn assert_nonterminal_sexpr<'a>(
+        expression: &'a Expression,
+        expected_name: &str,
+    ) -> &'a Vec<Expression> {
+        let children = assert_nonterminal(expression, "expression");
+        assert_eq!(children.len(), 2);
+        assert_terminal(&children[0], "identifier", Some(expected_name));
+        assert_nonterminal(&children[1], "sub_expressions")
+    }
+
+    fn assert_terminal_sexpr(
+        expression: &Expression,
+        expected_name: &str,
+        expected_value: Option<&str>,
+    ) {
+        let children = assert_nonterminal(expression, "expression");
+        assert!(children.len() >= 1);
+        assert_terminal(&children[0], "identifier", Some(expected_name));
+        if expected_value.is_some() {
+            assert_eq!(children.len(), 2);
+            let value = assert_nonterminal(&children[1], "string");
+            assert_eq!(value.len(), 1);
+            assert_terminal(&value[0], "string_value", expected_value);
+        }
+    }
+
     const TEXT: &str = indoc! {r#"
     My Test
 
@@ -295,89 +425,6 @@ mod tests {
       )
     )
     "#};
-
-    fn assert_nonterminal<'a>(
-        expression: &'a Expression,
-        expected_name: &str,
-    ) -> &'a Vec<Expression> {
-        match expression {
-            Expression::NonTerminal { name, children } => {
-                assert_eq!(name, expected_name);
-                children
-            }
-            _ => panic!("Expected non-terminal expression but found {expression:?}"),
-        }
-    }
-
-    fn assert_terminal(expression: &Expression, expected_name: &str, expected_value: Option<&str>) {
-        match expression {
-            Expression::Terminal { name, value } => {
-                assert_eq!(name, expected_name);
-                match (value, expected_value) {
-                    (Some(actual), Some(expected)) => assert_eq!(actual.trim(), expected),
-                    (Some(actual), None) => {
-                        panic!("Terminal node has value {actual} but there is no expected value")
-                    }
-                    (None, Some(expected)) => {
-                        panic!("Terminal node has no value but expected {expected}")
-                    }
-                    _ => (),
-                }
-            }
-            _ => panic!("Expected non-terminal expression but found {expression:?}"),
-        }
-    }
-
-    fn assert_nonterminal_sexpr<'a>(
-        expression: &'a Expression,
-        expected_name: &str,
-    ) -> &'a Vec<Expression> {
-        let children = assert_nonterminal(expression, "expression");
-        assert_eq!(children.len(), 2);
-        assert_terminal(&children[0], "rule_name", Some(expected_name));
-        assert_nonterminal(&children[1], "sub_expressions")
-    }
-
-    fn assert_terminal_sexpr(
-        expression: &Expression,
-        expected_name: &str,
-        expected_value: Option<&str>,
-    ) {
-        let children = assert_nonterminal(expression, "expression");
-        assert!(children.len() >= 1);
-        assert_terminal(&children[0], "rule_name", Some(expected_name));
-        if expected_value.is_some() {
-            assert_eq!(children.len(), 2);
-            let value = assert_nonterminal(&children[1], "rule_value_str");
-            assert_eq!(value.len(), 1);
-            assert_terminal(&value[0], "rule_value", expected_value);
-        }
-    }
-
-    #[test]
-    fn test_parse() -> Result<(), TestError<Rule>> {
-        let test_case: TestCase = TestParser::parse(TEXT)
-            .map_err(|source| TestError::Parser { source })
-            .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
-            })?;
-        assert_eq!(test_case.name, "My Test");
-        assert_eq!(test_case.code, "fn x() int {\n  return 1;\n}");
-        let expression = test_case.expression;
-        let children = assert_nonterminal(&expression, "source_file");
-        assert_eq!(children.len(), 1);
-        let children = assert_nonterminal(&children[0], "function_definition");
-        assert_eq!(children.len(), 4);
-        assert_terminal(&children[0], "identifier", Some("x"));
-        assert_terminal(&children[1], "parameter_list", None);
-        assert_terminal(&children[2], "primitive_type", Some("int"));
-        let children = assert_nonterminal(&children[3], "block");
-        assert_eq!(children.len(), 1);
-        let children = assert_nonterminal(&children[0], "return_statement");
-        assert_eq!(children.len(), 1);
-        assert_terminal(&children[0], "number", Some("1"));
-        Ok(())
-    }
 
     #[test]
     fn test_parse_from_code() -> Result<(), TestError<Rule>> {
@@ -407,11 +454,63 @@ mod tests {
         Ok(())
     }
 
+    const TEXT_WITH_SKIP: &str = indoc! {r#"
+    My Test
+
+    =======
+
+    fn x() int {
+      return 1;
+    }
+
+    =======
+    
+    (source_file
+      (function_definition
+        (identifier: "x")
+        (parameter_list)
+        (primitive_type: "int")
+        (block
+          #[skip(depth = 1)]
+          (return_statement 
+            (number: "1")
+          )
+        )
+      )
+    )
+    "#};
+
+    #[test]
+    fn test_parse() -> Result<(), TestError<Rule>> {
+        let test_case: TestCase = TestParser::parse(TEXT_WITH_SKIP)
+            .map_err(|source| TestError::Parser { source })
+            .and_then(|pair| {
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+            })?;
+        assert_eq!(test_case.name, "My Test");
+        assert_eq!(test_case.code, "fn x() int {\n  return 1;\n}");
+        let expression = test_case.expression;
+        let children = assert_nonterminal(&expression, "source_file");
+        assert_eq!(children.len(), 1);
+        let children = assert_nonterminal(&children[0], "function_definition");
+        assert_eq!(children.len(), 4);
+        assert_terminal(&children[0], "identifier", Some("x"));
+        assert_terminal(&children[1], "parameter_list", None);
+        assert_terminal(&children[2], "primitive_type", Some("int"));
+        let children = assert_nonterminal(&children[3], "block");
+        assert_eq!(children.len(), 1);
+        let next = assert_skip(&children[0], 1);
+        let children = assert_nonterminal(&next, "return_statement");
+        assert_eq!(children.len(), 1);
+        assert_terminal(&children[0], "number", Some("1"));
+        Ok(())
+    }
+
     #[test]
     fn test_format() -> Result<(), TestError<Rule>> {
         let mut writer = String::new();
         let mut formatter = ExpressionFormatter::from_defaults(&mut writer);
-        let test_case: TestCase = TestParser::parse(TEXT)
+        let test_case: TestCase = TestParser::parse(TEXT_WITH_SKIP)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
                 TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
@@ -426,6 +525,7 @@ mod tests {
             (parameter_list)
             (primitive_type: "int")
             (block
+              #[skip(depth = 1)]
               (return_statement
                 (number: "1")
               )

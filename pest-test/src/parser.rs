@@ -41,8 +41,8 @@ mod tests {
         let expression = pairs.next().expect("Missing expression");
         assert_eq!(expression.as_rule(), Rule::expression);
         let mut pairs = expression.into_inner();
-        let rule_name = pairs.next().expect("Missing rule name");
-        assert_eq!(rule_name.as_rule(), Rule::rule_name);
+        let rule_name = pairs.next().expect("Missing identifier");
+        assert_eq!(rule_name.as_rule(), Rule::identifier);
         assert_eq!(rule_name.as_str(), expected_name);
         let subexpressions = pairs.next().expect("Missing subexpressions");
         assert_eq!(subexpressions.as_rule(), Rule::sub_expressions);
@@ -57,16 +57,16 @@ mod tests {
         let expression = pairs.next().expect("Missing expression");
         assert_eq!(expression.as_rule(), Rule::expression);
         let mut pairs = expression.into_inner();
-        let rule_name = pairs.next().expect("Missing rule name");
-        assert_eq!(rule_name.as_rule(), Rule::rule_name);
+        let rule_name = pairs.next().expect("Missing identifier");
+        assert_eq!(rule_name.as_rule(), Rule::identifier);
         assert_eq!(rule_name.as_str(), expected_name);
         match (pairs.next(), expected_value) {
             (Some(value_str), Some(expected)) => {
-                assert_eq!(value_str.as_rule(), Rule::rule_value_str);
-                assert_eq!(value_str.as_rule(), Rule::rule_value_str);
+                assert_eq!(value_str.as_rule(), Rule::string);
+                assert_eq!(value_str.as_rule(), Rule::string);
                 let mut pairs = value_str.into_inner();
                 let value = pairs.next().expect("Missing value");
-                assert_eq!(value.as_rule(), Rule::rule_value);
+                assert_eq!(value.as_rule(), Rule::string_value);
                 assert_eq!(value.as_str(), expected);
             }
             (Some(value_str), None) => panic!(
