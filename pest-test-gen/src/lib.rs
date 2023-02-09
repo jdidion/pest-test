@@ -262,7 +262,7 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
             quote! {
                 #[test]
                 fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
-                    let tester = pest_test::PestTester::new(
+                    let tester: pest_test::PestTester<#rule_path, #parser_path> = pest_test::PestTester::new(
                         #test_dir,
                         #test_ext,
                         #rule_path::#rule_ident,

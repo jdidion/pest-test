@@ -8,6 +8,10 @@ mod example {
     pub struct ExampleParser;
 }
 
+#[pest_tests(super::example::ExampleParser, super::example::Rule, "source_file")]
+#[cfg(test)]
+mod test_cases {}
+
 #[pest_tests(
     super::example::ExampleParser,
     super::example::Rule,
@@ -15,4 +19,4 @@ mod example {
     lazy_static = true
 )]
 #[cfg(test)]
-mod test_cases {}
+mod test_cases_lazy_static {}
