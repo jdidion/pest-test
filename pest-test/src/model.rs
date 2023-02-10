@@ -1,6 +1,7 @@
 use crate::parser::Rule;
 use colored::{Color, Colorize};
 use pest::{iterators::Pair, RuleType};
+use snailquote::unescape;
 use std::{
     collections::HashSet,
     fmt::{Display, Result as FmtResult, Write},
@@ -26,10 +27,6 @@ fn assert_rule<'a>(pair: Pair<'a, Rule>, rule: Rule) -> Result<Pair<'a, Rule>, M
             pair, rule
         )))
     }
-}
-
-fn unescape(s: String) -> String {
-    s.replace("\\\"", "\"")
 }
 
 #[derive(Clone, Debug)]
@@ -85,15 +82,10 @@ impl Expression {
                     }
                 }
                 Rule::string => {
-                    let value = pair
-                        .into_inner()
-                        .next()
-                        .map(|pair| assert_rule(pair, Rule::string_value))
-                        .transpose()
-                        .map(|opt| {
-                            opt.map(|pair| unescape(pair.as_str().to_owned()))
-                                .or_else(|| Some(String::new()))
-                        })?;
+                    let s = pair.as_str().trim();
+                    let value = Some(unescape(s).map_err(|err| {
+                        ModelError(format!("Error unescaping string value {}: {:?}", s, err))
+                    })?);
                     Self::Terminal { name, value }
                 }
                 other => return Err(ModelError(format!("Unexpected rule {:?}", other))),

@@ -2,7 +2,7 @@
 name = "pest-test"
 description = "Testing framework for pest parsers"
 authors = ["John Didion <github@didion.net>"]
-version = "0.1.4"
+version = "0.1.5"
 keywords = ["parsing", "pest"]
 categories = ["parsing"]
 repository = "https://github.com/jdidion/pest-test"
@@ -14,6 +14,7 @@ readme = "../README.md"
 colored = "2.0.0"
 pest = "2.5.2"
 pest_derive = "2.5.2"
+snailquote = "0.3.1"
 thiserror = "1.0.38"
 
 [dev-dependencies]
