@@ -298,22 +298,26 @@ impl TestCase {
             .ok_or_else(|| ModelError::from_str("Missing code block"))
             .and_then(|pair| assert_rule(pair, Rule::code_block))
             .map(|pair| pair.into_inner())?;
-        code_block
+        let div = code_block
             .next()
             .ok_or_else(|| ModelError::from_str("Missing div"))
-            .and_then(|pair| assert_rule(pair, Rule::div))?;
-        let code = code_block
+            .and_then(|pair| assert_rule(pair, Rule::div))
+            .map(|pair| pair.as_str())?;
+        let mut code = code_block
             .next()
             .ok_or_else(|| ModelError::from_str("Missing code"))
             .and_then(|pair| assert_rule(pair, Rule::code))
-            .map(|pair| pair.as_str().trim().to_owned())?;
+            .map(|pair| pair.as_str())?;
         let expression = inner
             .next()
             .ok_or_else(|| ModelError::from_str("Missing expression"))
             .and_then(|pair| assert_rule(pair, Rule::expression))?;
+        if !div.starts_with('+'){
+            code = code.trim();
+        }
         Ok(TestCase {
             name,
-            code,
+            code: code.to_owned(),
             expression: Expression::try_from_sexpr(expression)?,
         })
     }

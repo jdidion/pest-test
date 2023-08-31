@@ -1,6 +1,6 @@
 test_case = { SOI ~ test_name ~ code_block ~ expression ~ EOI }
 test_name = @{ ( !NEWLINE ~ ANY )+ }
-code_block = { PUSH(div) ~ code ~ POP }
+code_block = ${ PUSH(div) ~ code ~ POP }
 div = @{ ( !NEWLINE ~ ANY ){3,} }
 code = @{ ( !PEEK ~ ANY )* }
 expression = { skip? ~ lparen ~ identifier ~ ( sub_expressions | ( colon ~ string ) )? ~ rparen }
