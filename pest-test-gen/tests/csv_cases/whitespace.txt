@@ -1,0 +1,17 @@
+Test Preserves Trailing Whitespace
+
++++++++++
+11,22
+33,44
++++++++++
+
+(file
+  (record
+    (field: "11")
+    (field: "22")
+  )
+  (record
+    (field: "33")
+    (field: "44")
+  )
+)
