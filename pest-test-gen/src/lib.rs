@@ -108,7 +108,7 @@ impl Args {
                         "no_eoi" => {
                             args.no_eoi = match lit {
                                 Lit::Bool(b) => b.value,
-                                _ => abort!(lit, "Invalid argument to 'strict' attribute"),
+                                _ => abort!(lit, "Invalid argument to 'no_eoi' attribute"),
                             }
                         }
                         "lazy_static" => {
