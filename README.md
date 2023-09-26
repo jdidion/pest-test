@@ -1,4 +1,4 @@
-# pest-test
+****# pest-test
 
 Testing framework for [pest parser](https://pest.rs) (similar to `tree-sitter test`).
 
@@ -7,10 +7,11 @@ Testing framework for [pest parser](https://pest.rs) (similar to `tree-sitter te
 A test case is a text file with three sections:
 
 * The test name must be on the first line of the file. It may contain any characters except newline.
-* The source code block is delimited by any sequence of three or more characters. The same sequence of characters must preceed and follow the code block, and that sequence of characters may not appear anywhere within the code block. Any whitespace between the code and the delimiter is trimmed.
+* The source code block is delimited by any sequence of three or more non-whitespace characters. The same sequence of characters must preceed and follow the code block, and that sequence of characters may not appear anywhere within the code block.
+* The code block must be both preceeded and followed by a line separator. The outer-most line separators are trimmed off. This means that if your parser is sensitive to leading/trailing whitespace, you must make sure to put the correct number of empty lines before/after the code block.
 * The expected output syntax tree written as an [S-expression](https://en.wikipedia.org/wiki/S-expression). Optionally, a terminal node may be followed by its expected string value.
 
-Here is an example test. Note that the code block delimiter is exactly 7 '=' characters.
+Here is an example test. Note that the code block delimiter is exactly 7 '=' characters. In this case, the parser ignores implicit whitespace, so the numbers of blank lines before/after the code are arbitrary.
 
 ```
 My Test
