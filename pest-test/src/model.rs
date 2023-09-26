@@ -302,11 +302,42 @@ impl TestCase {
             .next()
             .ok_or_else(|| ModelError::from_str("Missing div"))
             .and_then(|pair| assert_rule(pair, Rule::div))?;
-        let code = code_block
+        let code_untrimmed = code_block
             .next()
             .ok_or_else(|| ModelError::from_str("Missing code"))
             .and_then(|pair| assert_rule(pair, Rule::code))
-            .map(|pair| pair.as_str().trim().to_owned())?;
+            .map(|pair| pair.as_str())?;
+        // The code must start and end with at least one line separator - remove first and last
+        let code_len = code_untrimmed.len();
+        assert!(code_len >= 2);
+        let mut code_chars = code_untrimmed.chars();
+        let code_start: usize = match code_chars.next() {
+            Some('\n') => 1,
+            Some('\r') => match code_chars.next() {
+                Some('\n') if code_len > 2 => 2,
+                _ => 1,
+            },
+            _ => {
+                return Err(ModelError::from_str(
+                    "Code block must be preceeded by at least one line separator",
+                ))
+            }
+        };
+        let mut code_chars = code_untrimmed.chars().rev();
+        let code_end: usize = code_len
+            - match code_chars.next() {
+                Some('\r') => 1,
+                Some('\n') => match code_chars.next() {
+                    Some('\r') if code_len - code_start > 2 => 2,
+                    _ => 1,
+                },
+                _ => {
+                    return Err(ModelError::from_str(
+                        "Code block must be followed by at least one line separator",
+                    ))
+                }
+            };
+        let code = code_untrimmed[code_start..code_end].to_owned();
         let expression = inner
             .next()
             .ok_or_else(|| ModelError::from_str("Missing expression"))
@@ -517,7 +548,7 @@ mod tests {
                 TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
             })?;
         assert_eq!(test_case.name, "My Test");
-        assert_eq!(test_case.code, "fn x() int {\n  return 1;\n}");
+        assert_eq!(test_case.code, "\nfn x() int {\n  return 1;\n}\n");
         let expression = test_case.expression;
         let children = assert_nonterminal(&expression, "source_file");
         assert_eq!(children.len(), 1);
