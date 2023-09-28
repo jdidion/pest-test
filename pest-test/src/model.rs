@@ -231,7 +231,7 @@ impl<'a> ExpressionFormatter<'a> {
                 self.write_str(name)?;
                 if let Some(value) = value {
                     self.write_str(": \"")?;
-                    self.write_str(value)?;
+                    self.write_str(&value.escape_default().to_string())?;
                     self.write_char('"')?;
                 }
                 self.write_char(')')?;
