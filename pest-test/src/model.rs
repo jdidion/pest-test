@@ -461,6 +461,27 @@ mod tests {
         Ok(())
     }
 
+    const BLANK_LINES: &str = indoc! {r#"
+
+
+"#};
+
+    #[test]
+    fn test_escape_whitespace() -> Result<(), TestError<Rule>> {
+        let mut writer = String::new();
+        let mut formatter = ExpressionFormatter::from_defaults(&mut writer);
+        let expression = Expression::Terminal {
+            name: "blank_lines".to_string(),
+            value: Some(BLANK_LINES.to_string()),
+        };
+        formatter
+            .fmt(&expression)
+            .expect("Error formatting expression");
+        let expected = r#"(blank_lines: "\n\n")"#;
+        assert_eq!(writer, expected);
+        Ok(())
+    }
+
     const TEXT: &str = indoc! {r#"
     My Test
 
