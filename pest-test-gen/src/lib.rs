@@ -290,12 +290,12 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
 /// is created and used by all the generated test functions (dependency on `lazy_static` is
 /// required), otherwise a separate instance is created for each test.
 ///
-/// Arguments:
-/// * <parser type>: (required) the full path to the struct you defined that derives `pest::Parser`,
+/// # Arguments:
+/// * **parser_type**: (required) the full path to the struct you defined that derives `pest::Parser`,
 ///   e.g. `mycrate::parser::MyParser`.
-/// * <rule type>: (required) the full path to the `Rule` enum, e.g. `mycrate::parser::Rule`.
-/// * <rule name>: (required) the name of the `Rule` variant from which to start parsing.
-/// * skip_rules: (optional) a list of rules to skip when parsing; by default `Rule::EOI` is
+/// * **rule_type**: (required) the full path to the `Rule` enum, e.g. `mycrate::parser::Rule`.
+/// * **rule_name**: (required) the name of the `Rule` variant from which to start parsing.
+/// * skip_rules: (optional) a list of names of rules to skip when parsing; by default `Rule::EOI` is
 ///   skipped unless `no_eoi = true`.
 /// * no_eoi: (optional) there is no `Rule::EOI` - don't automatically add it to `skip_rules`.
 /// * dir: (optional) the root directory where pest test cases are found; defaults to 'tests/pest'.
@@ -309,20 +309,25 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
 /// * lazy_static: (optional) whether to create a singleton `PestTester` - requires dependency on
 ///   `lazy_static`; defaults to `false`.
 ///
-/// Example:
+/// # Example:
+/// ```
+///
 /// use pest_test_gen;
 ///
 /// #[pest_tests(
 ///     mycrate::parser::MyParser,
 ///     mycrate::parser::Rule,
 ///     "root_rule",
-///     skip_rules = (mycrate::parser::Rule::comment),
+///     skip_rules("comment"),
 ///     subdir = "foo",
 ///     recursive = true,
 ///     lazy_static = true
 /// )]
 /// #[cfg(test)]
 /// mod parser_tests {}
+///
+/// ```
+
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn pest_tests(attr: TokenStream, item: TokenStream) -> TokenStream {
