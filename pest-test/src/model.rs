@@ -205,7 +205,8 @@ impl<'a> ExpressionFormatter<'a> {
         match self.color {
             Some(color) => {
                 let s = format!("{}", s.color(color));
-                println!("write_str color {s}");
+                let ss = s.escape_default().to_string();
+                println!("write_str color {ss}");
                 self.writer.write_str(s.as_ref())
             }
             None => self.writer.write_str(s),
