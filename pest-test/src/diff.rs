@@ -14,7 +14,7 @@ pub enum ExpressionDiff {
     },
     Missing(Expression),
     Extra(Expression),
-    Parital {
+    Partial {
         name: String,
         children: Vec<ExpressionDiff>,
     },
@@ -118,7 +118,7 @@ impl ExpressionDiff {
                     .count()
                     > 0;
                 if partial {
-                    ExpressionDiff::Parital {
+                    ExpressionDiff::Partial {
                         name: expected_name.clone(),
                         children,
                     }
@@ -164,7 +164,7 @@ impl ExpressionDiff {
             }
             ExpressionDiff::Missing(exp) => exp.name().to_owned(),
             ExpressionDiff::Extra(exp) => exp.name().to_owned(),
-            ExpressionDiff::Parital { name, children: _ } => name.to_owned(),
+            ExpressionDiff::Partial { name, children: _ } => name.to_owned(),
         }
     }
 
@@ -247,7 +247,7 @@ impl<'a> ExpressionDiffFormatterExt for ExpressionFormatter<'a> {
                 self.fmt(expression)?;
                 self.color = None;
             }
-            ExpressionDiff::Parital { name, children } => {
+            ExpressionDiff::Partial { name, children } => {
                 self.write_indent()?;
                 self.write_char('(')?;
                 self.write_str(name)?;
@@ -366,7 +366,7 @@ mod tests {
         expected_name: &'a str,
     ) -> &'a Vec<ExpressionDiff> {
         match diff {
-            ExpressionDiff::Parital { name, children } => {
+            ExpressionDiff::Partial { name, children } => {
                 assert_eq!(expected_name, name);
                 children
             }
