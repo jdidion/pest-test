@@ -31,7 +31,7 @@ pub enum TestError<R> {
     #[error("Error building model from test case parse tree")]
     Model { source: ModelError },
     #[error("Error parsing code with target parser")]
-    Target { source: PestError<R> },
+    Target { source: Box<PestError<R>> },
     #[error("Expected and actual parse trees are different:\n{diff}")]
     Diff { diff: ExpressionDiff },
 }
