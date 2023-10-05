@@ -1,5 +1,3 @@
 [workspace]
-members = [
-    "pest-test",
-    "pest-test-gen"
-]
+resolver = "2"
+members = ["pest-test", "pest-test-gen"]
