@@ -227,10 +227,14 @@ impl<'a> ExpressionDiffFormatterExt for ExpressionFormatter<'a> {
         expected_color: Option<Color>,
         actual_color: Option<Color>,
     ) -> FmtResult {
-        println!("B {diff}");
+        println!("B");
         match diff {
-            ExpressionDiff::Equal(expression) => self.fmt(expression)?,
+            ExpressionDiff::Equal(expression) => {
+                println!("Equal");
+                self.fmt(expression)?
+            }
             ExpressionDiff::NotEqual { expected, actual } => {
+                println!("NotEqual");
                 self.color = expected_color;
                 self.fmt(expected)?;
                 self.write_newline()?;
@@ -239,16 +243,19 @@ impl<'a> ExpressionDiffFormatterExt for ExpressionFormatter<'a> {
                 self.color = None;
             }
             ExpressionDiff::Missing(expression) => {
+                println!("Missing");
                 self.color = expected_color;
                 self.fmt(expression)?;
                 self.color = None;
             }
             ExpressionDiff::Extra(expression) => {
+                println!("Extra");
                 self.color = actual_color;
                 self.fmt(expression)?;
                 self.color = None;
             }
             ExpressionDiff::Partial { name, children } => {
+                println!("Partial");
                 self.write_indent()?;
                 self.write_char('(')?;
                 self.write_str(name)?;
