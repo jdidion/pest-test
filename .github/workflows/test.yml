@@ -7,6 +7,7 @@ on:
 
 env: 
   TERM: xterm-256color
+  CLICOLOR_FORCE: true
   CARGO_TERM_COLOR: always
 
 jobs:
