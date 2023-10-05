@@ -24,6 +24,9 @@ jobs:
           command: build
       - run:
           echo "$TERM"
+          echo "$NO_COLOR"
+          echo "$CLICOLOR"
+          echo "$CLICOLOR_FORCE"
       - uses: actions-rs/cargo@v1
         with:
           command: test
