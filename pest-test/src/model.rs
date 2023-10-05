@@ -201,10 +201,13 @@ impl<'a> ExpressionFormatter<'a> {
     }
 
     pub(crate) fn write_str(&mut self, s: &str) -> FmtResult {
+        println!("write_str {:?}", self.color);
         match self.color {
-            Some(color) => self
-                .writer
-                .write_str(format!("{}", s.color(color)).as_ref()),
+            Some(color) => {
+                let s = format!("{}", s.color(color));
+                println!("write_str color {s}");
+                self.writer.write_str(s.as_ref())
+            }
             None => self.writer.write_str(s),
         }
     }
@@ -219,6 +222,7 @@ impl<'a> ExpressionFormatter<'a> {
             buffering: false,
         };
         string_formatter.fmt(expression)?;
+        println!("color {:?}", self.color);
         self.write_str(buf.as_ref())?;
         Ok(())
     }
