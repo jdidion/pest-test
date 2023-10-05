@@ -226,7 +226,7 @@ impl<'a> ExpressionFormatter<'a> {
                 self.write_str(name)?;
                 if let Some(value) = value {
                     self.write_str(": \"")?;
-                    self.write_str(value)?;
+                    self.write_str(&value.escape_default().to_string())?;
                     self.write_char('"')?;
                 }
                 self.write_char(')')?;
@@ -453,6 +453,27 @@ mod tests {
         assert_eq!(children.len(), 2);
         assert_terminal(&children[0], "identifier", Some("x"));
         assert_terminal(&children[1], "value", Some("\"hi\""));
+        Ok(())
+    }
+
+    const BLANK_LINES: &str = indoc! {r#"
+
+
+"#};
+
+    #[test]
+    fn test_escape_whitespace() -> Result<(), TestError<Rule>> {
+        let mut writer = String::new();
+        let mut formatter = ExpressionFormatter::from_defaults(&mut writer);
+        let expression = Expression::Terminal {
+            name: "blank_lines".to_string(),
+            value: Some(BLANK_LINES.to_string()),
+        };
+        formatter
+            .fmt(&expression)
+            .expect("Error formatting expression");
+        let expected = r#"(blank_lines: "\n\n")"#;
+        assert_eq!(writer, expected);
         Ok(())
     }
 
