@@ -49,7 +49,7 @@ impl ExpressionDiff {
                     value: Some(actual_value),
                 },
             ) if expected_name == actual_name
-                && (ignore_missing_expected_values || actual_value == "") =>
+                && (ignore_missing_expected_values || actual_value.is_empty()) =>
             {
                 ExpressionDiff::Equal(actual.clone())
             }
@@ -111,10 +111,7 @@ impl ExpressionDiff {
                 }
                 let partial = children
                     .iter()
-                    .filter(|child| match child {
-                        ExpressionDiff::Equal(_) => false,
-                        _ => true,
-                    })
+                    .filter(|child| !matches!(child, ExpressionDiff::Equal(_)))
                     .count()
                     > 0;
                 if partial {

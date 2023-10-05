@@ -1,8 +1,9 @@
 use pest::{error::Error as PestError, iterators::Pair, Parser, RuleType};
-use pest_derive;
 use std::marker::PhantomData;
 use thiserror::Error;
 
+// TODO: clippy complains about the `Pest` variant being large -
+// maybe box `source`?
 #[derive(Error, Debug)]
 pub enum ParserError<R> {
     #[error("Error parsing source text")]
@@ -11,14 +12,14 @@ pub enum ParserError<R> {
     Empty,
 }
 
-pub fn parse<'a, R: RuleType, P: Parser<R>>(
-    text: &'a str,
+pub fn parse<R: RuleType, P: Parser<R>>(
+    text: &str,
     rule: R,
     _: PhantomData<P>,
-) -> Result<Pair<'a, R>, ParserError<R>> {
+) -> Result<Pair<'_, R>, ParserError<R>> {
     P::parse(rule, text)
         .map_err(|source| ParserError::Pest { source })
-        .and_then(|mut code_pairs| code_pairs.next().ok_or_else(|| ParserError::Empty))
+        .and_then(|mut code_pairs| code_pairs.next().ok_or(ParserError::Empty))
 }
 
 #[derive(pest_derive::Parser)]
@@ -26,7 +27,7 @@ pub fn parse<'a, R: RuleType, P: Parser<R>>(
 pub struct TestParser;
 
 impl TestParser {
-    pub fn parse<'a>(text: &'a str) -> Result<Pair<'a, Rule>, ParserError<Rule>> {
+    pub fn parse(text: &str) -> Result<Pair<'_, Rule>, ParserError<Rule>> {
         parse(text, Rule::test_case, PhantomData::<Self>)
     }
 }

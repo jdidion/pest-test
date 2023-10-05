@@ -77,7 +77,7 @@ impl Args {
                                 _ => abort!(lit, "Invalid argument to 'dir' attribute"),
                             };
                             if path.is_relative() {
-                                path = PathBuf::from(pest_test::cargo_manifest_dir()).join(path)
+                                path = pest_test::cargo_manifest_dir().join(path)
                             }
                             args.dir = path
                         }
@@ -172,10 +172,10 @@ impl Args {
                 let path = entry.path();
                 if path.is_dir() {
                     false
-                } else if self.ext == "" {
+                } else if self.ext.is_empty() {
                     path.extension().is_none()
                 } else {
-                    entry.path().extension().map(|s| s.into()) == Some(self.ext.as_ref())
+                    entry.path().extension() == Some(self.ext.as_ref())
                 }
             })
             .map(move |entry| {
@@ -202,7 +202,7 @@ fn rule_variant(rule_path: &Path, variant_ident: Ident) -> Path {
 }
 
 fn add_tests(module: &mut ItemMod, args: &Args) {
-    let (_, content) = module.content.get_or_insert_with(|| Default::default());
+    let (_, content) = module.content.get_or_insert_with(Default::default);
 
     let test_dir = args.dir.as_os_str().to_str().unwrap().to_owned();
     let test_ext = args.ext.clone();

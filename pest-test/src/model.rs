@@ -18,7 +18,7 @@ impl ModelError {
     }
 }
 
-fn assert_rule<'a>(pair: Pair<'a, Rule>, rule: Rule) -> Result<Pair<'a, Rule>, ModelError> {
+fn assert_rule(pair: Pair<'_, Rule>, rule: Rule) -> Result<Pair<'_, Rule>, ModelError> {
     if pair.as_rule() == rule {
         Ok(pair)
     } else {
@@ -46,7 +46,7 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn try_from_sexpr<'a>(pair: Pair<'a, Rule>) -> Result<Self, ModelError> {
+    pub fn try_from_sexpr(pair: Pair<'_, Rule>) -> Result<Self, ModelError> {
         let mut inner = pair.into_inner();
         let skip_depth: usize = if inner.peek().map(|pair| pair.as_rule()) == Some(Rule::skip) {
             let depth_pair = inner
@@ -72,10 +72,8 @@ impl Expression {
             None => Self::Terminal { name, value: None },
             Some(pair) => match pair.as_rule() {
                 Rule::sub_expressions => {
-                    let children: Result<Vec<Expression>, ModelError> = pair
-                        .into_inner()
-                        .map(|pair| Self::try_from_sexpr(pair))
-                        .collect();
+                    let children: Result<Vec<Expression>, ModelError> =
+                        pair.into_inner().map(Self::try_from_sexpr).collect();
                     Self::NonTerminal {
                         name,
                         children: children?,
@@ -101,8 +99,8 @@ impl Expression {
         }
     }
 
-    pub fn try_from_code<'a, R: RuleType>(
-        pair: Pair<'a, R>,
+    pub fn try_from_code<R: RuleType>(
+        pair: Pair<'_, R>,
         skip_rules: &HashSet<R>,
     ) -> Result<Self, ModelError> {
         let name = format!("{:?}", pair.as_rule());
@@ -117,10 +115,7 @@ impl Expression {
                 name,
                 value: Some(value.to_owned()),
             }),
-            Ok(children) => Ok(Self::NonTerminal {
-                name,
-                children: children,
-            }),
+            Ok(children) => Ok(Self::NonTerminal { name, children }),
             Err(e) => Err(e),
         }
     }
@@ -286,7 +281,7 @@ pub struct TestCase {
 }
 
 impl TestCase {
-    pub fn try_from_pair<'a>(pair: Pair<'a, Rule>) -> Result<Self, ModelError> {
+    pub fn try_from_pair(pair: Pair<'_, Rule>) -> Result<Self, ModelError> {
         let mut inner = pair.into_inner();
         let name = inner
             .next()
