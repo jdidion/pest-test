@@ -6,6 +6,7 @@ on:
     types: [opened, reopened]
 
 env: 
+  TERM: xterm-256color
   CARGO_TERM_COLOR: always
 
 jobs:
@@ -21,6 +22,8 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
+      - run:
+          echo "$TERM"
       - uses: actions-rs/cargo@v1
         with:
           command: test
