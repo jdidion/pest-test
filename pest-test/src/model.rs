@@ -264,6 +264,7 @@ impl<'a> ExpressionFormatter<'a> {
     }
 
     pub fn fmt(&mut self, expression: &Expression) -> FmtResult {
+        println!("Buffering {} color {:?}", self.buffering, self.color);
         if self.buffering {
             self.fmt_buffered(expression)
         } else {
