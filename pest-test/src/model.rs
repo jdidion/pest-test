@@ -204,7 +204,9 @@ impl<'a> ExpressionFormatter<'a> {
         println!("write_str {:?}", self.color);
         match self.color {
             Some(color) => {
-                let s = format!("{}", s.color(color));
+                let c = s.color(color);
+                println!("{:?}", c);
+                let s = format!("{}", c);
                 let ss = s.escape_default().to_string();
                 println!("write_str color {ss}");
                 self.writer.write_str(s.as_ref())
