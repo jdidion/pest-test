@@ -8,8 +8,8 @@ A test case is a text file with three sections:
 
 * The test name must be on the first line of the file. It may contain any characters except newline.
 * The source code block is delimited by any sequence of three or more non-whitespace characters. The same sequence of characters must preceed and follow the code block, and that sequence of characters may not appear anywhere within the code block.
-* The code block must be both preceeded and followed by a line separator. The outer-most line separators are trimmed off. This means that if your parser is sensitive to leading/trailing whitespace, you must make sure to put the correct number of empty lines before/after the code block.
-* The expected output syntax tree written as an [S-expression](https://en.wikipedia.org/wiki/S-expression). Optionally, a terminal node may be followed by its expected string value.
+* The code block must be both preceeded and followed by a line separator. The outer-most line separators are trimmed off; any remaining line separators are left in tact. This means that if your parser is sensitive to leading/trailing whitespace, you must make sure to put the correct number of empty lines before/after the code block.
+* The expected output syntax tree written as an [S-expression](https://en.wikipedia.org/wiki/S-expression). Optionally, a terminal node may be followed by its expected string value. Expected string values may contain escape characters - they are unescaped prior to comparison to the actual values.
 
 Here is an example test. Note that the code block delimiter is exactly 7 '=' characters. In this case, the parser ignores implicit whitespace, so the numbers of blank lines before/after the code are arbitrary.
 
@@ -43,7 +43,7 @@ fn x() int {
 
 Nodes in the expected output S-expression may be annotated with attributes of the form `#[name(args)]`. The currently recognized attributes are:
 
-* `skip`: For some grammars, there are multiple levels of nesting that are only necessary to work around the limitations of PEG parsers, e.g. mathematical expressions with left-recursion. To simplify test cases involving such grammars, the `skip` attribute can be used to ignore a specified number of levels of nesting in the actual parse tree.
+* `skip`: For some grammars, there are multiple levels of nesting that are only necessary to work around the limitations of PEG parsers, e.g., mathematical expressions with left-recursion. To simplify test cases involving such grammars, the `skip` attribute can be used to ignore a specified number of levels of nesting in the actual parse tree.
   ```
   (expression
     #[skip(depth = 3)]

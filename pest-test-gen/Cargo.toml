@@ -2,7 +2,7 @@
 name = "pest-test-gen"
 description = "Macro for generating tests from pest-test test cases"
 authors = ["John Didion <github@didion.net>"]
-version = "0.1.6"
+version = "0.1.7"
 keywords = ["parsing", "pest", "macro"]
 categories = ["parsing"]
 repository = "https://github.com/jdidion/pest-test"

@@ -2,7 +2,7 @@
 name = "pest-test"
 description = "Testing framework for pest parsers"
 authors = ["John Didion <github@didion.net>"]
-version = "0.1.5"
+version = "0.1.6"
 keywords = ["parsing", "pest"]
 categories = ["parsing"]
 repository = "https://github.com/jdidion/pest-test"
