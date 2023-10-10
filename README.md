@@ -11,7 +11,7 @@ A test case is a text file with three sections:
 * The code block must be both preceeded and followed by a line separator. The outer-most line separators are trimmed off; any remaining line separators are left in tact. This means that if your parser is sensitive to leading/trailing whitespace, you must make sure to put the correct number of empty lines before/after the code block.
 * The expected output syntax tree written as an [S-expression](https://en.wikipedia.org/wiki/S-expression). Optionally, a terminal node may be followed by its expected string value. Expected string values may contain escape characters - they are unescaped prior to comparison to the actual values.
 
-Here is an example test. Note that the code block delimiter is exactly 7 '=' characters. In this case, the parser ignores implicit whitespace, so the numbers of blank lines before/after the code are arbitrary.
+Here is an example test. Note that the code block delimiter is exactly 7 `=` characters. In this case, the parser ignores implicit whitespace, so the numbers of blank lines before/after the code are arbitrary.
 
 ```
 My Test
