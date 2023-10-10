@@ -15,7 +15,6 @@ Here is an example test. Note that the code block delimiter is exactly 7 '=' cha
 
 ```
 My Test
-
 =======
 
 fn x() int {
