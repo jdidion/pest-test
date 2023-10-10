@@ -1,4 +1,4 @@
-****# pest-test
+# pest-test
 
 Testing framework for [pest parser](https://pest.rs) (similar to `tree-sitter test`).
 
