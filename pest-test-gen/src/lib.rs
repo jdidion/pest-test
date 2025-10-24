@@ -248,9 +248,9 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
 
         for test in get_all_tests(full_file_name) {
             let fn_name = if test == "" {
-                format_ident!("test_{}", file_name)
+                format_ident!("test_{}", file_name.replace("/", "_"))
             } else {
-                format_ident!("test_{}_{}", file_name, test)
+                format_ident!("test_{}_{}", file_name.replace("/", "_"), test)
             };
 
             let fn_tokens = if args.lazy_static {
