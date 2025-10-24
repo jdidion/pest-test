@@ -273,10 +273,12 @@ impl Display for Expression {
     }
 }
 
+#[derive(Debug)]
 pub struct TestSuite(pub Vec<TestCase>);
 
 #[derive(Clone, Debug)]
 pub struct TestCase {
+    pub id: Option<String>,
     pub name: String,
     pub code: String,
     pub expression: Expression,
@@ -323,11 +325,30 @@ impl<'a> IntoIterator for &'a mut TestSuite {
 impl TestCase {
     pub fn try_from_pair(pair: Pair<'_, Rule>) -> Result<Self, ModelError> {
         let mut inner = pair.into_inner();
-        let name = inner
+        let (id, name) = inner
             .next()
             .ok_or_else(|| ModelError::from_str("Missing test name"))
-            .and_then(|pair| assert_rule(pair, Rule::test_name))
-            .map(|pair| pair.as_str().trim().to_owned())?;
+            .and_then(|pair| {
+                let test_name = assert_rule(pair, Rule::test_name)?;
+                let mut test_name_pairs = test_name.into_inner();
+                let first = test_name_pairs
+                    .next()
+                    .ok_or_else(|| ModelError::from_str("Missing test name"))?;
+
+                match first.as_rule() {
+                    Rule::test_identifier => {
+                        let id = Some(first.as_str().trim().to_owned());
+                        let name = test_name_pairs
+                            .next()
+                            .ok_or_else(|| ModelError::from_str("Missing test name"))
+                            .and_then(|pair| assert_rule(pair, Rule::test_title))
+                            .map(|pair| pair.as_str().trim().to_owned())?;
+                        Ok((id, name))
+                    }
+                    Rule::test_title => Ok((None, first.as_str().trim().to_owned())),
+                    _ => Err(ModelError::from_str("Invalid test name")),
+                }
+            })?;
         let mut code_block = inner
             .next()
             .ok_or_else(|| ModelError::from_str("Missing code block"))
@@ -378,6 +399,7 @@ impl TestCase {
             .ok_or_else(|| ModelError::from_str("Missing expression"))
             .and_then(|pair| assert_rule(pair, Rule::expression))?;
         Ok(TestCase {
+            id,
             name,
             code,
             expression: Expression::try_from_sexpr(expression)?,
@@ -488,6 +510,8 @@ mod tests {
                     TestSuite::try_from_pair(pair).map_err(|source| TestError::Model { source })?;
                 Ok(suite.into_iter().next().expect("Missing test case"))
             })?;
+        assert_eq!(test_case.id, None);
+        assert_eq!(test_case.name, "Quoted");
         let expression = test_case.expression;
         let children = assert_nonterminal(&expression, "source_file");
         assert_eq!(children.len(), 1);
