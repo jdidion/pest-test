@@ -1,6 +1,6 @@
 pub mod diff;
 pub mod model;
-mod parser;
+pub mod parser;
 
 use crate::{
     diff::ExpressionDiff,
@@ -81,10 +81,11 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
             .test_dir
             .join(format!("{}.{}", name.as_ref(), self.test_ext));
         let text = read_to_string(path).map_err(|source| TestError::IO { source })?;
-        let pair =
+        let root =
             TestParser::parse(text.as_ref()).map_err(|source| TestError::Parser { source })?;
+        let file = root.into_inner().next().expect("Missing file");
         let test_case =
-            TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })?;
+            TestCase::try_from_pair(file).map_err(|source| TestError::Model { source })?;
         let code_pair =
             parser::parse(test_case.code.as_ref(), self.rule, self.parser).map_err(|source| {
                 match source {
@@ -109,5 +110,27 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
     /// Equivalent to `self.evaluate(name, true)
     pub fn evaluate_strict<N: AsRef<str>>(&self, name: N) -> Result<(), TestError<R>> {
         self.evaluate(name, false)
+    }
+
+    pub fn evaluate_all<N: AsRef<str>>(
+        &self,
+        file_name: N,
+        ignore_missing_expected_values: bool,
+    ) -> Result<(), TestError<R>> {
+        let path = self
+            .test_dir
+            .join(format!("{}.{}", file_name.as_ref(), self.test_ext));
+        let text = read_to_string(path).map_err(|source| TestError::IO { source })?;
+        let root =
+            TestParser::parse(text.as_ref()).map_err(|source| TestError::Parser { source })?;
+        let testcases = root.into_inner();
+        for test_case in testcases {
+            self.evaluate(test_case.as_str(), ignore_missing_expected_values)?;
+        }
+        Ok(())
+    }
+
+    pub fn evaluate_all_strict<N: AsRef<str>>(&self, file_name: N) -> Result<(), TestError<R>> {
+        self.evaluate_all(file_name, false)
     }
 }

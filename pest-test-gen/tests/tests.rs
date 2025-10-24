@@ -16,6 +16,15 @@ mod example_test_cases {}
     super::example::ExampleParser,
     super::example::Rule,
     "source_file",
+    dir = "tests/multitest"
+)]
+#[cfg(test)]
+mod multitest {}
+
+#[pest_tests(
+    super::example::ExampleParser,
+    super::example::Rule,
+    "source_file",
     lazy_static = true
 )]
 #[cfg(test)]

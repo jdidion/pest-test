@@ -243,45 +243,85 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
         content.push(item);
     }
 
-    for test_name in args.iter_tests() {
-        let fn_name = format_ident!("test_{}", test_name);
-        let fn_tokens = if args.lazy_static {
-            quote! {
-                #[test]
-                fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
-                    let res = (*TESTER).evaluate_strict(#test_name);
-                    if let Err(pest_test::TestError::Diff { ref diff }) = res {
-                        diff.print_test_result(*COLORIZE).unwrap();
+    for file_name in args.iter_tests() {
+        let full_file_name = format!("{}/{}.{}", test_dir, file_name, test_ext);
+
+        for test in get_all_tests(full_file_name) {
+            let fn_name = if test == "" {
+                format_ident!("test_{}", file_name)
+            } else {
+                format_ident!("test_{}_{}", file_name, test)
+            };
+
+            let fn_tokens = if args.lazy_static {
+                quote! {
+                    #[test]
+                    fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
+                        let res = (*TESTER).evaluate_strict(#file_name);
+                        if let Err(pest_test::TestError::Diff { ref diff }) = res {
+                            diff.print_test_result(*COLORIZE).unwrap();
+                        }
+                        res
                     }
-                    res
                 }
-            }
+            } else {
+                quote! {
+                    #[test]
+                    fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
+                        let tester: pest_test::PestTester<#rule_path, #parser_path> = pest_test::PestTester::new(
+                            #test_dir,
+                            #test_ext,
+                            #rule_path::#rule_ident,
+                            std::collections::HashSet::from([#(#skip_rules),*])
+                        );
+                        let res = tester.evaluate_strict(#file_name);
+                        if let Err(pest_test::TestError::Diff { ref diff }) = res {
+                            let colorize = option_env!("CARGO_TERM_COLOR").unwrap_or("always") != "never";
+                            diff.print_test_result(colorize).unwrap();
+                        }
+                        res
+                    }
+                }
+            };
+            let item: Item = match syn::parse2(fn_tokens) {
+                Ok(item) => item,
+                Err(err) => {
+                    abort_call_site!(format!("Error generating test fn {}: {:?}", file_name, err))
+                }
+            };
+            content.push(item);
+        }
+    }
+}
+
+fn get_all_tests(full_file_name: String) -> Vec<String> {
+    let content = std::fs::read_to_string(full_file_name).expect("Error reading test file");
+    let file_pairs =
+        pest_test::parser::TestParser::parse(&content).expect("Error parsing test file");
+    let test_suite = pest_test::model::TestSuite::try_from_pair(file_pairs)
+        .expect("Error building model from test file");
+    test_suite
+        .into_iter()
+        .map(|test_case| parse_testcase_id(&test_case.name).unwrap_or("".to_string()))
+        .collect()
+}
+
+fn parse_testcase_id(line: &str) -> Option<String> {
+    if let Some((test_id, _)) = line.split_once(':') {
+        if test_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+            && test_id
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_ascii_alphabetic())
+        {
+            Some(test_id.to_string())
         } else {
-            quote! {
-                #[test]
-                fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
-                    let tester: pest_test::PestTester<#rule_path, #parser_path> = pest_test::PestTester::new(
-                        #test_dir,
-                        #test_ext,
-                        #rule_path::#rule_ident,
-                        std::collections::HashSet::from([#(#skip_rules),*])
-                    );
-                    let res = tester.evaluate_strict(#test_name);
-                    if let Err(pest_test::TestError::Diff { ref diff }) = res {
-                        let colorize = option_env!("CARGO_TERM_COLOR").unwrap_or("always") != "never";
-                        diff.print_test_result(colorize).unwrap();
-                    }
-                    res
-                }
-            }
-        };
-        let item: Item = match syn::parse2(fn_tokens) {
-            Ok(item) => item,
-            Err(err) => {
-                abort_call_site!(format!("Error generating test fn {}: {:?}", test_name, err))
-            }
-        };
-        content.push(item);
+            None
+        }
+    } else {
+        None
     }
 }
 

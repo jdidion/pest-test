@@ -273,7 +273,7 @@ impl Display for ExpressionDiff {
 mod tests {
     use super::{ExpressionDiff, ExpressionDiffFormatterExt};
     use crate::{
-        model::{Expression, ExpressionFormatter, TestCase},
+        model::{Expression, ExpressionFormatter, TestCase, TestSuite},
         parser::Rule,
         TestError, TestParser,
     };
@@ -474,7 +474,9 @@ mod tests {
         let test_case: TestCase = TestParser::parse(TEXT)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+                TestSuite::try_from_pair(pair)
+                    .map_err(|source| TestError::Model { source })
+                    .and_then(|suite| Ok(suite.into_iter().next().expect("Missing test case")))
             })?;
         let expected_sexpr = make_expected_sexpression(false);
         let diff_strict =
@@ -498,7 +500,9 @@ mod tests {
         let test_case: TestCase = TestParser::parse(TEXT)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+                TestSuite::try_from_pair(pair)
+                    .map_err(|source| TestError::Model { source })
+                    .and_then(|suite| Ok(suite.into_iter().next().expect("Missing test case")))
             })?;
         let expected_sexpr = make_expected_sexpression(false);
         let diff_lenient =
@@ -514,7 +518,9 @@ mod tests {
         let test_case: TestCase = TestParser::parse(TEXT)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+                TestSuite::try_from_pair(pair)
+                    .map_err(|source| TestError::Model { source })
+                    .and_then(|suite| Ok(suite.into_iter().next().expect("Missing test case")))
             })?;
         let expected_sexpr = make_expected_sexpression(true);
         let diff_lenient =
@@ -531,7 +537,9 @@ mod tests {
         let test_case: TestCase = TestParser::parse(TEXT)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+                TestSuite::try_from_pair(pair)
+                    .map_err(|source| TestError::Model { source })
+                    .and_then(|suite| Ok(suite.into_iter().next().expect("Missing test case")))
             })?;
         let expected_sexpr = make_expected_sexpression(false);
         let diff = ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, false);
@@ -566,7 +574,9 @@ mod tests {
         let test_case: TestCase = TestParser::parse(TEXT)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+                TestSuite::try_from_pair(pair)
+                    .map_err(|source| TestError::Model { source })
+                    .and_then(|suite| Ok(suite.into_iter().next().expect("Missing test case")))
             })?;
         let expected_sexpr = make_expected_sexpression(false);
         let diff = ExpressionDiff::from_expressions(&expected_sexpr, &test_case.expression, false);

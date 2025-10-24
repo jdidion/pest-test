@@ -273,11 +273,51 @@ impl Display for Expression {
     }
 }
 
+pub struct TestSuite(pub Vec<TestCase>);
+
 #[derive(Clone, Debug)]
 pub struct TestCase {
     pub name: String,
     pub code: String,
     pub expression: Expression,
+}
+
+impl TestSuite {
+    pub fn try_from_pair(pair: Pair<'_, Rule>) -> Result<Self, ModelError> {
+        let inner = pair.into_inner();
+        let test_cases = inner
+            .filter(|pair| pair.as_rule() != Rule::EOI)
+            .map(TestCase::try_from_pair)
+            .collect::<Result<Vec<TestCase>, ModelError>>()?;
+        Ok(TestSuite(test_cases))
+    }
+}
+
+impl IntoIterator for TestSuite {
+    type Item = TestCase;
+    type IntoIter = std::vec::IntoIter<TestCase>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a TestSuite {
+    type Item = &'a TestCase;
+    type IntoIter = std::slice::Iter<'a, TestCase>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut TestSuite {
+    type Item = &'a mut TestCase;
+    type IntoIter = std::slice::IterMut<'a, TestCase>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
 }
 
 impl TestCase {
@@ -347,7 +387,7 @@ impl TestCase {
 
 #[cfg(test)]
 mod tests {
-    use super::{Expression, ExpressionFormatter, TestCase};
+    use super::{Expression, ExpressionFormatter, TestCase, TestSuite};
     use crate::{
         parser::{Rule, TestParser},
         TestError,
@@ -444,7 +484,9 @@ mod tests {
         let test_case: TestCase = TestParser::parse(WITH_QUOTE)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+                let suite =
+                    TestSuite::try_from_pair(pair).map_err(|source| TestError::Model { source })?;
+                Ok(suite.into_iter().next().expect("Missing test case"))
             })?;
         let expression = test_case.expression;
         let children = assert_nonterminal(&expression, "source_file");
@@ -504,13 +546,18 @@ mod tests {
 
     #[test]
     fn test_parse_from_code() -> Result<(), TestError<Rule>> {
-        let test_pair = TestParser::parse(TEXT).map_err(|source| TestError::Parser { source })?;
+        let test_pair = TestParser::parse(TEXT)
+            .map_err(|source| TestError::Parser { source })?
+            .into_inner()
+            .next()
+            .expect("Missing test case");
         let skip_rules = HashSet::from([Rule::EOI]);
         let code_expression = Expression::try_from_code(test_pair, &skip_rules)
             .map_err(|source| TestError::Model { source })?;
         let children = assert_nonterminal(&code_expression, "test_case");
         assert_eq!(children.len(), 3);
-        assert_terminal(&children[0], "test_name", Some("My Test"));
+        let test_name = assert_nonterminal(&children[0], "test_name");
+        assert_terminal(&test_name[0], "test_title", Some("My Test"));
         let code_block = assert_nonterminal(&children[1], "code_block");
         assert_eq!(code_block.len(), 2);
         assert_terminal(&code_block[0], "div", Some("======="));
@@ -561,7 +608,9 @@ mod tests {
         let test_case: TestCase = TestParser::parse(TEXT_WITH_SKIP)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+                TestSuite::try_from_pair(pair)
+                    .map_err(|source| TestError::Model { source })
+                    .and_then(|suite| Ok(suite.into_iter().next().expect("Missing test case")))
             })?;
         assert_eq!(test_case.name, "My Test");
         assert_eq!(test_case.code, "\nfn x() int {\n  return 1;\n}\n");
@@ -589,7 +638,9 @@ mod tests {
         let test_case: TestCase = TestParser::parse(TEXT_WITH_SKIP)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
-                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+                TestSuite::try_from_pair(pair)
+                    .map_err(|source| TestError::Model { source })
+                    .and_then(|suite| Ok(suite.into_iter().next().expect("Missing test case")))
             })?;
         formatter
             .fmt(&test_case.expression)
