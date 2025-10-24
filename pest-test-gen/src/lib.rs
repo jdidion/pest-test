@@ -254,12 +254,13 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
             } else {
                 format_ident!("test_{}_{}", file_name.replace("/", "_"), test)
             };
+            let strict = !args.strict;
 
             let fn_tokens = if args.lazy_static {
                 quote! {
                     #[test]
                     fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
-                        let res = (*TESTER).evaluate_strict(#file_name);
+                        let res = (*TESTER).evaluate(#file_name, #strict);
                         if let Err(pest_test::TestError::Diff { ref diff }) = res {
                             diff.print_test_result(*COLORIZE).unwrap();
                         }
@@ -276,7 +277,7 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
                             #rule_path::#rule_ident,
                             std::collections::HashSet::from([#(#skip_rules),*])
                         );
-                        let res = tester.evaluate_strict(#file_name);
+                        let res = tester.evaluate(#file_name, #strict);
                         if let Err(pest_test::TestError::Diff { ref diff }) = res {
                             let colorize = option_env!("CARGO_TERM_COLOR").unwrap_or("always") != "never";
                             diff.print_test_result(colorize).unwrap();
