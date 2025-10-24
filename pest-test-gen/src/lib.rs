@@ -245,10 +245,12 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
 
     for file_name in args.iter_tests() {
         let full_file_name = format!("{}/{}.{}", test_dir, file_name, test_ext);
-
-        for test in get_all_tests(full_file_name) {
+        let tests = get_all_tests(full_file_name);
+        for test in tests {
             let fn_name = if test == "" {
                 format_ident!("test_{}", file_name.replace("/", "_"))
+            } else if test.starts_with("$") {
+                format_ident!("test_{}", test.replacen("$", "", 1))
             } else {
                 format_ident!("test_{}_{}", file_name.replace("/", "_"), test)
             };
@@ -310,11 +312,11 @@ fn parse_testcase_id(line: &str) -> Option<String> {
     if let Some((test_id, _)) = line.split_once(':') {
         if test_id
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
             && test_id
                 .chars()
                 .next()
-                .map_or(false, |c| c.is_ascii_alphabetic())
+                .map_or(false, |c| c.is_ascii_alphabetic() || c == '$')
         {
             Some(test_id.to_string())
         } else {

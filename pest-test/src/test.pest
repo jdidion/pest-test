@@ -1,7 +1,8 @@
 file = ${ SOI ~ test_case ~ ( NEWLINE{2,} ~ test_case )* ~ NEWLINE* ~ EOI }
 test_case = !{ test_name ~ code_block ~ expression }
 test_name = { (test_identifier ~ colon)? ~ test_title }
-test_identifier = @{ ASCII_ALPHA ~ ( ASCII_ALPHANUMERIC | "_" )* }
+test_identifier = @{ absolute_name? ~ ASCII_ALPHA ~ ( ASCII_ALPHANUMERIC | "_" )* }
+absolute_name = { "$" }
 test_title = @{ ( !NEWLINE ~ ANY )+ }
 code_block = ${ PUSH(div) ~ code ~ POP }
 div = @{ ( !WHITESPACE ~ ANY ){3,} }
