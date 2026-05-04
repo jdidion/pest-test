@@ -368,7 +368,7 @@ mod tests {
         }
     }
 
-    fn assert_skip<'a>(expression: &'a Expression, expected_depth: usize) -> &'a Box<Expression> {
+    fn assert_skip(expression: &Expression, expected_depth: usize) -> &Expression {
         match expression {
             Expression::Skip { depth, next } => {
                 assert_eq!(expected_depth, *depth);
@@ -413,7 +413,7 @@ mod tests {
         expected_value: Option<&str>,
     ) {
         let children = assert_nonterminal(expression, "expression");
-        assert!(children.len() >= 1);
+        assert!(!children.is_empty());
         assert_terminal(&children[0], "identifier", Some(expected_name));
         if expected_value.is_some() {
             assert_eq!(children.len(), 2);
@@ -576,7 +576,7 @@ mod tests {
         let children = assert_nonterminal(&children[3], "block");
         assert_eq!(children.len(), 1);
         let next = assert_skip(&children[0], 1);
-        let children = assert_nonterminal(&next, "return_statement");
+        let children = assert_nonterminal(next, "return_statement");
         assert_eq!(children.len(), 1);
         assert_terminal(&children[0], "number", Some("1"));
         Ok(())
