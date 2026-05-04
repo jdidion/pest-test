@@ -24,7 +24,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Set up compilation cache (sccache)
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install nextest
         uses: taiki-e/install-action@nextest
       - name: Unit tests
@@ -38,7 +38,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Set up compilation cache (sccache)
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Code coverage
@@ -62,7 +62,7 @@ jobs:
         with:
           components: clippy
       - name: Set up compilation cache (sccache)
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.10
       - name: Clippy check
         run: cargo ci-lint
 
@@ -76,6 +76,6 @@ jobs:
         with:
           components: rustfmt
       - name: Set up compilation cache (sccache)
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.10
       - name: Rustfmt check
         run: cargo ci-fmt
