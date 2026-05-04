@@ -1,0 +1,81 @@
+name: Check and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up compilation cache (sccache)
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+      - name: Unit tests
+        run: cargo ci-test
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up compilation cache (sccache)
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Code coverage
+        run: |
+          cargo llvm-cov --all-features --codecov --output-path codecov.json
+          cargo llvm-cov report --text
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          files: codecov.json
+          fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Set up compilation cache (sccache)
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Clippy check
+        run: cargo ci-lint
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Set up compilation cache (sccache)
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Rustfmt check
+        run: cargo ci-fmt
