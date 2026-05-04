@@ -379,9 +379,8 @@ mod tests {
         match diff {
             ExpressionDiff::Equal(Expression::Terminal { name, value }) => {
                 assert_eq!(expected_name, name);
-                match (expected_value, value) {
-                    (Some(expected), Some(actual)) => assert_eq!(expected, actual),
-                    _ => (),
+                if let (Some(expected), Some(actual)) = (expected_value, value) {
+                    assert_eq!(expected, actual);
                 }
             }
             _ => panic!("Expectedc diff to be equal but was {}", diff),
@@ -563,6 +562,10 @@ mod tests {
 
     #[test]
     fn test_format_color() -> Result<(), TestError<Rule>> {
+        // `colored` normally auto-disables when stderr isn't a TTY, which it
+        // isn't under `cargo test`. Force it on so the ANSI codes actually
+        // appear in `writer`.
+        colored::control::set_override(true);
         let test_case: TestCase = TestParser::parse(TEXT)
             .map_err(|source| TestError::Parser { source })
             .and_then(|pair| {
