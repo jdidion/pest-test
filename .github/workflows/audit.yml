@@ -1,0 +1,23 @@
+name: Security Audit
+
+on:
+  schedule:
+    # Runs at 00:00 UTC everyday
+    - cron: '0 0 * * *'
+  push:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  pull_request:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up compilation cache (sccache)
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - uses: rustsec/audit-check@v1.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
