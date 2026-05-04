@@ -1,8 +1,6 @@
 use pest_test_gen::pest_tests;
 
 mod example {
-    use pest_derive;
-
     #[derive(pest_derive::Parser)]
     #[grammar = "tests/example.pest"]
     pub struct ExampleParser;
@@ -22,8 +20,6 @@ mod example_test_cases {}
 mod example_test_cases_lazy_static {}
 
 mod csv {
-    use pest_derive;
-
     #[derive(pest_derive::Parser)]
     #[grammar = "tests/csv.pest"]
     pub struct CsvParser;
