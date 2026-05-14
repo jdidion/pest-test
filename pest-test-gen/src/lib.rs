@@ -220,6 +220,7 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
             Ident::new("EOI", Span::call_site()),
         ));
     }
+    let ignore_missing_expected_values = !args.strict;
 
     if args.lazy_static {
         let lazy_static_tokens = quote! {
@@ -243,46 +244,69 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
         content.push(item);
     }
 
-    for test_name in args.iter_tests() {
-        let fn_name = format_ident!("test_{}", test_name);
-        let fn_tokens = if args.lazy_static {
-            quote! {
-                #[test]
-                fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
-                    let res = (*TESTER).evaluate_strict(#test_name);
-                    if let Err(pest_test::TestError::Diff { ref diff }) = res {
-                        diff.print_test_result(*COLORIZE).unwrap();
+    for file_name in args.iter_tests() {
+        let full_file_name = format!("{}/{}.{}", test_dir, file_name, test_ext);
+        let tests = get_all_tests(full_file_name);
+        for test_id in tests {
+            let fn_name = if test_id == "" {
+                format_ident!("test_{}", file_name.replace("/", "_"))
+            } else if test_id.starts_with("$") {
+                format_ident!("test_{}", test_id.replacen("$", "", 1))
+            } else {
+                format_ident!("test_{}_{}", file_name.replace("/", "_"), test_id)
+            };
+
+            let fn_tokens = if args.lazy_static {
+                quote! {
+                    #[test]
+                    fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
+                        let res = (*TESTER).evaluate_single(#file_name, #test_id, #ignore_missing_expected_values);
+                        if let Err(pest_test::TestError::Diff { ref diff }) = res {
+                            diff.print_test_result(*COLORIZE).unwrap();
+                        }
+                        res
                     }
-                    res
                 }
-            }
-        } else {
-            quote! {
-                #[test]
-                fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
-                    let tester: pest_test::PestTester<#rule_path, #parser_path> = pest_test::PestTester::new(
-                        #test_dir,
-                        #test_ext,
-                        #rule_path::#rule_ident,
-                        std::collections::HashSet::from([#(#skip_rules),*])
-                    );
-                    let res = tester.evaluate_strict(#test_name);
-                    if let Err(pest_test::TestError::Diff { ref diff }) = res {
-                        let colorize = option_env!("CARGO_TERM_COLOR").unwrap_or("always") != "never";
-                        diff.print_test_result(colorize).unwrap();
+            } else {
+                quote! {
+                    #[test]
+                    fn #fn_name() -> Result<(), pest_test::TestError<#rule_path>> {
+                        let tester: pest_test::PestTester<#rule_path, #parser_path> = pest_test::PestTester::new(
+                            #test_dir,
+                            #test_ext,
+                            #rule_path::#rule_ident,
+                            std::collections::HashSet::from([#(#skip_rules),*])
+                        );
+                        let res = tester.evaluate_single(#file_name, #test_id, #ignore_missing_expected_values);
+                        if let Err(pest_test::TestError::Diff { ref diff }) = res {
+                            let colorize = option_env!("CARGO_TERM_COLOR").unwrap_or("always") != "never";
+                            diff.print_test_result(colorize).unwrap();
+                        }
+                        res
                     }
-                    res
                 }
-            }
-        };
-        let item: Item = match syn::parse2(fn_tokens) {
-            Ok(item) => item,
-            Err(err) => {
-                abort_call_site!(format!("Error generating test fn {}: {:?}", test_name, err))
-            }
-        };
-        content.push(item);
+            };
+            let item: Item = match syn::parse2(fn_tokens) {
+                Ok(item) => item,
+                Err(err) => {
+                    abort_call_site!(format!("Error generating test fn {}: {:?}", fn_name, err))
+                }
+            };
+            content.push(item);
+        }
     }
+}
+
+fn get_all_tests(full_file_name: String) -> Vec<String> {
+    let content = std::fs::read_to_string(full_file_name).expect("Error reading test file");
+    let file_pairs =
+        pest_test::parser::TestParser::parse(&content).expect("Error parsing test file");
+    let test_suite = pest_test::model::TestSuite::try_from_pair(file_pairs)
+        .expect("Error building model from test file");
+    test_suite
+        .into_iter()
+        .map(|test_case| test_case.id.unwrap_or("".to_string()))
+        .collect()
 }
 
 /// When added to a test module, adds test functions for pest-test test cases. Must come before

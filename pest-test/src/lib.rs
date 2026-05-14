@@ -1,10 +1,10 @@
 pub mod diff;
 pub mod model;
-mod parser;
+pub mod parser;
 
 use crate::{
     diff::ExpressionDiff,
-    model::{Expression, ModelError, TestCase},
+    model::{Expression, ModelError, TestCase, TestSuite},
     parser::{ParserError, Rule, TestParser},
 };
 use pest::{error::Error as PestError, Parser, RuleType};
@@ -34,6 +34,8 @@ pub enum TestError<R> {
     Target { source: Box<PestError<R>> },
     #[error("Expected and actual parse trees are different:\n{diff}")]
     Diff { diff: ExpressionDiff },
+    #[error("Test case {test_id} not found")]
+    TestNotFound { test_id: String },
 }
 
 pub struct PestTester<R: RuleType, P: Parser<R>> {
@@ -81,10 +83,11 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
             .test_dir
             .join(format!("{}.{}", name.as_ref(), self.test_ext));
         let text = read_to_string(path).map_err(|source| TestError::IO { source })?;
-        let pair =
+        let root =
             TestParser::parse(text.as_ref()).map_err(|source| TestError::Parser { source })?;
+        let file = root.into_inner().next().expect("Missing file");
         let test_case =
-            TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })?;
+            TestCase::try_from_pair(file).map_err(|source| TestError::Model { source })?;
         let code_pair =
             parser::parse(test_case.code.as_ref(), self.rule, self.parser).map_err(|source| {
                 match source {
@@ -109,5 +112,78 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
     /// Equivalent to `self.evaluate(name, true)
     pub fn evaluate_strict<N: AsRef<str>>(&self, name: N) -> Result<(), TestError<R>> {
         self.evaluate(name, false)
+    }
+
+    pub fn evaluate_single<N: AsRef<str>, I: AsRef<str>>(
+        &self,
+        file_name: N,
+        test_id: I,
+        ignore_missing_expected_values: bool,
+    ) -> Result<(), TestError<R>> {
+        let path = self
+            .test_dir
+            .join(format!("{}.{}", file_name.as_ref(), self.test_ext));
+        let text = read_to_string(path.clone()).map_err(|source| TestError::IO { source })?;
+        let root =
+            TestParser::parse(text.as_ref()).map_err(|source| TestError::Parser { source })?;
+        let test_suite =
+            TestSuite::try_from_pair(root).map_err(|source| TestError::Model { source })?;
+        let id = if test_id.as_ref() == "" {
+            None
+        } else {
+            Some(test_id.as_ref().to_string())
+        };
+        let test_case = test_suite
+            .into_iter()
+            .find(|test_case| {
+                // println!("test_case: {:#?}, id: {:?}", test_case.id, id);
+                test_case.id == id
+            })
+            .ok_or(TestError::TestNotFound {
+                test_id: test_id.as_ref().to_string(),
+            })?;
+
+        let code_pair =
+            parser::parse(test_case.code.as_ref(), self.rule, self.parser).map_err(|source| {
+                match source {
+                    ParserError::Empty => TestError::Parser {
+                        source: ParserError::Empty,
+                    },
+                    ParserError::Pest { source } => TestError::Target { source },
+                }
+            })?;
+        let code_expr = Expression::try_from_code(code_pair, &self.skip_rules)
+            .map_err(|source| TestError::Model { source })?;
+        match ExpressionDiff::from_expressions(
+            &test_case.expression,
+            &code_expr,
+            ignore_missing_expected_values,
+        ) {
+            ExpressionDiff::Equal(_) => Ok(()),
+            diff => Err(TestError::Diff { diff }),
+        }
+    }
+
+    pub fn evaluate_single_strict<N: AsRef<str>, I: AsRef<str>>(
+        &self,
+        file_name: N,
+        test_id: I,
+    ) -> Result<(), TestError<R>> {
+        self.evaluate_single(file_name, test_id, false)
+    }
+
+    pub fn list_tests<N: AsRef<str>>(&self, file_name: N) -> Result<Vec<String>, TestError<R>> {
+        let path = self
+            .test_dir
+            .join(format!("{}.{}", file_name.as_ref(), self.test_ext));
+        let text = read_to_string(path).map_err(|source| TestError::IO { source })?;
+        let root =
+            TestParser::parse(text.as_ref()).map_err(|source| TestError::Parser { source })?;
+        let test_suite =
+            TestSuite::try_from_pair(root).map_err(|source| TestError::Model { source })?;
+        Ok(test_suite
+            .into_iter()
+            .map(|test_case| test_case.id.unwrap_or("".to_string()))
+            .collect())
     }
 }
