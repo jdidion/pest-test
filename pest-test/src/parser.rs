@@ -132,4 +132,22 @@ mod tests {
         assert_terminal(&mut pairs, "number", Some("1"));
         Ok(())
     }
+
+    /// Input that does not match the test grammar should be mapped to
+    /// `ParserError::Pest`, with the wrapped pest error displayable.
+    #[test]
+    fn test_parse_error() {
+        // A test case requires a name line, a divider, code, and an
+        // s-expression. An empty string cannot satisfy the grammar.
+        let err = TestParser::parse("").expect_err("empty input should fail to parse");
+        match err {
+            ParserError::Pest { source } => {
+                // The wrapped error should render via Display.
+                assert!(!format!("{source}").is_empty());
+            }
+            ParserError::Empty => panic!("expected Pest error, got Empty"),
+        }
+        // The ParserError Display impls should also be non-empty.
+        assert!(format!("{}", ParserError::<Rule>::Empty).contains("Empty"));
+    }
 }

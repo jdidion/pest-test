@@ -347,7 +347,7 @@ impl TestCase {
 
 #[cfg(test)]
 mod tests {
-    use super::{Expression, ExpressionFormatter, TestCase};
+    use super::{assert_rule, Expression, ExpressionFormatter, ModelError, TestCase};
     use crate::{
         parser::{Rule, TestParser},
         TestError,
@@ -609,6 +609,140 @@ mod tests {
           )
         )"#};
         assert_eq!(writer, expected);
+        Ok(())
+    }
+
+    /// `assert_rule` should pass the pair through unchanged when the rule
+    /// matches and return a descriptive `ModelError` when it does not. The
+    /// error branch (and `ModelError`'s `Display`) is otherwise only hit on
+    /// malformed input, so exercise it directly.
+    #[test]
+    fn test_assert_rule() {
+        // Parse a known test case and grab its top-level pair, which is a
+        // `Rule::test_case`.
+        let pair = TestParser::parse(TEXT).expect("parse failed");
+        // Matching rule: returns Ok with the same pair.
+        let ok = assert_rule(pair.clone(), Rule::test_case);
+        assert!(ok.is_ok());
+        // Mismatched rule: returns Err whose Display is the model-error message.
+        let err = assert_rule(pair, Rule::identifier).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("Error creating model element"),
+            "unexpected ModelError display: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_model_error_debug() {
+        // The `#[error(...)]` Display and derived Debug should both render.
+        let err = ModelError::from_str("boom");
+        assert_eq!(
+            format!("{err}"),
+            "Error creating model element from parser pair"
+        );
+        assert!(format!("{err:?}").contains("boom"));
+    }
+
+    /// `get_descendant(0)` returns the node itself; descending into a terminal
+    /// yields `None`; descending through a `Skip` consumes its depth.
+    #[test]
+    fn test_get_descendant() {
+        let terminal = Expression::Terminal {
+            name: "leaf".to_owned(),
+            value: None,
+        };
+        // depth 0 => the node itself.
+        assert!(matches!(
+            terminal.get_descendant(0),
+            Some(Expression::Terminal { .. })
+        ));
+        // A terminal has no children, so any positive depth is None.
+        assert!(terminal.get_descendant(1).is_none());
+
+        let nested = Expression::NonTerminal {
+            name: "outer".to_owned(),
+            children: vec![Expression::NonTerminal {
+                name: "inner".to_owned(),
+                children: vec![Expression::Terminal {
+                    name: "leaf".to_owned(),
+                    value: Some("v".to_owned()),
+                }],
+            }],
+        };
+        assert_eq!(nested.get_descendant(2).unwrap().name(), "leaf");
+        // Descending past the bottom yields None.
+        assert!(nested.get_descendant(3).is_none());
+
+        // A Skip with depth == requested descent forwards to `next`.
+        let skip = Expression::Skip {
+            depth: 1,
+            next: Box::new(Expression::Terminal {
+                name: "skipped".to_owned(),
+                value: None,
+            }),
+        };
+        assert_eq!(skip.get_descendant(1).unwrap().name(), "skipped");
+        // Requesting a descent shallower than the skip depth yields None.
+        let deep_skip = Expression::Skip {
+            depth: 3,
+            next: Box::new(Expression::Terminal {
+                name: "skipped".to_owned(),
+                value: None,
+            }),
+        };
+        assert!(deep_skip.get_descendant(1).is_none());
+        // `name()` on a Skip delegates to its `next`.
+        assert_eq!(skip.name(), "skipped");
+        // `skip_depth()` reports the depth for Skip and 0 otherwise.
+        assert_eq!(skip.skip_depth(), 1);
+        assert_eq!(terminal.skip_depth(), 0);
+    }
+
+    /// A string value with an invalid escape sequence should surface as a
+    /// `ModelError` from `try_from_sexpr` (the `unescape` error branch).
+    #[test]
+    fn test_try_from_sexpr_unescape_error() {
+        // The grammar's `string_value` rule accepts any non-quote character,
+        // including a backslash followed by `z`. That sequence is not a valid
+        // escape, so `snailquote::unescape` fails and we get a ModelError.
+        const BAD_ESCAPE: &str = "Bad\n=====\n\nx\n\n=====\n\n(node: \"\\z\")\n";
+        let pair = TestParser::parse(BAD_ESCAPE).expect("parse should succeed");
+        let result = TestCase::try_from_pair(pair);
+        match result {
+            Err(err) => assert!(format!("{err:?}").contains("unescaping")),
+            Ok(tc) => panic!("expected unescape error, got {tc:?}"),
+        }
+    }
+
+    /// CRLF line endings around the code block must be trimmed correctly,
+    /// exercising the `\r\n` arms of the code-trimming logic.
+    #[test]
+    fn test_crlf_code_trimming() -> Result<(), TestError<Rule>> {
+        // Build the test text with explicit CRLF separators around the code.
+        let text = "My Test\r\n=======\r\nfn x() int {}\r\n=======\r\n(node)\r\n";
+        let test_case: TestCase = TestParser::parse(text)
+            .map_err(|source| TestError::Parser { source })
+            .and_then(|pair| {
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+            })?;
+        // The outermost CRLF separators are trimmed; the code itself remains.
+        assert_eq!(test_case.code, "fn x() int {}");
+        Ok(())
+    }
+
+    /// Bare carriage-return (old-Mac) line endings around the code block hit
+    /// the `\r`-not-followed-by-`\n` arm at the start and the bare-`\r` arm at
+    /// the end of the code-trimming logic.
+    #[test]
+    fn test_bare_cr_code_trimming() -> Result<(), TestError<Rule>> {
+        let text = "My Test\r=======\rfn x() int {}\r=======\r(node)\r";
+        let test_case: TestCase = TestParser::parse(text)
+            .map_err(|source| TestError::Parser { source })
+            .and_then(|pair| {
+                TestCase::try_from_pair(pair).map_err(|source| TestError::Model { source })
+            })?;
+        assert_eq!(test_case.code, "fn x() int {}");
         Ok(())
     }
 }

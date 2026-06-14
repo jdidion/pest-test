@@ -605,4 +605,122 @@ mod tests {
         assert_eq!(writer, expected);
         Ok(())
     }
+
+    fn terminal(name: &str) -> Expression {
+        Expression::Terminal {
+            name: name.to_owned(),
+            value: None,
+        }
+    }
+
+    fn nonterminal(name: &str, children: Vec<Expression>) -> Expression {
+        Expression::NonTerminal {
+            name: name.to_owned(),
+            children,
+        }
+    }
+
+    /// When an actual child's name matches a *later* expected child, the diff
+    /// algorithm emits `Missing` for the intervening expected children rather
+    /// than treating them as a reorder. This exercises the
+    /// `expected_names.contains(..)` peek-ahead branch.
+    #[test]
+    fn test_diff_reordered_children() {
+        let expected = nonterminal("root", vec![terminal("a"), terminal("b"), terminal("c")]);
+        // Actual has only "c", which appears later in the expected list.
+        let actual = nonterminal("root", vec![terminal("c")]);
+        let diff = ExpressionDiff::from_expressions(&expected, &actual, false);
+        let children = assert_partial(&diff, "root");
+        // The single actual "c" is consumed against expected "a"; since "c"
+        // also appears later in the expected list, the intervening expected
+        // children are reported missing and "c" itself is then missing too
+        // (the actual iterator is exhausted).
+        assert_eq!(children.len(), 3);
+        assert_missing(&children[0], "a");
+        assert_missing(&children[1], "b");
+        assert_missing(&children[2], "c");
+    }
+
+    /// An actual child whose name is absent from the expected children is
+    /// reported as `Extra` (the `else` arm of the name-mismatch branch).
+    #[test]
+    fn test_diff_extra_child() {
+        let expected = nonterminal("root", vec![terminal("a")]);
+        let actual = nonterminal("root", vec![terminal("z"), terminal("a")]);
+        let diff = ExpressionDiff::from_expressions(&expected, &actual, false);
+        let children = assert_partial(&diff, "root");
+        // First expected "a" mismatches actual "z" -> Missing(a) + Extra(z),
+        // then the trailing actual "a" has no expected pair -> Extra(a).
+        assert_missing(&children[0], "a");
+        assert_extra(&children[1], "z");
+        assert_extra(&children[2], "a");
+    }
+
+    /// `ExpressionDiff::name()` should report a sensible name for every variant.
+    #[test]
+    fn test_diff_name() {
+        assert_eq!(ExpressionDiff::Equal(terminal("eq")).name(), "eq");
+        assert_eq!(ExpressionDiff::Missing(terminal("miss")).name(), "miss");
+        assert_eq!(ExpressionDiff::Extra(terminal("extra")).name(), "extra");
+        // NotEqual with the same name reports that name.
+        let same = ExpressionDiff::NotEqual {
+            expected: terminal("x"),
+            actual: terminal("x"),
+        };
+        assert_eq!(same.name(), "x");
+        // NotEqual with differing names reports "expected/actual".
+        let diff_names = ExpressionDiff::NotEqual {
+            expected: terminal("want"),
+            actual: terminal("got"),
+        };
+        assert_eq!(diff_names.name(), "want/got");
+        // Partial reports its own name.
+        let partial = ExpressionDiff::Partial {
+            name: "part".to_owned(),
+            children: Vec::new(),
+        };
+        assert_eq!(partial.name(), "part");
+    }
+
+    /// `print_test_result` writes the framed diff to stderr in both colorized
+    /// and plain modes. We only assert that it returns Ok; the framing content
+    /// is covered by the formatter tests above.
+    #[test]
+    fn test_print_test_result() {
+        let expected = nonterminal("root", vec![terminal("a")]);
+        let actual = nonterminal("root", vec![terminal("b")]);
+        let diff = ExpressionDiff::from_expressions(&expected, &actual, false);
+        diff.print_test_result(false).expect("plain print failed");
+        colored::control::set_override(true);
+        diff.print_test_result(true)
+            .expect("colorized print failed");
+    }
+
+    /// The `Display` impl for `ExpressionDiff` delegates to the colorized
+    /// formatter; assert it produces non-empty output for an equal diff.
+    #[test]
+    fn test_diff_display() {
+        let diff = ExpressionDiff::Equal(terminal("leaf"));
+        let rendered = format!("{diff}");
+        assert!(rendered.contains("leaf"));
+    }
+
+    /// A `Skip` expected expression whose requested descendant does not exist
+    /// in the actual tree falls through to `NotEqual` (the `None` arm of the
+    /// Skip branch in `from_expressions`).
+    #[test]
+    fn test_diff_skip_no_descendant() {
+        // Expected asks to skip 5 levels, but the actual is a shallow terminal
+        // with no descendant at that depth.
+        let expected = Expression::Skip {
+            depth: 5,
+            next: Box::new(terminal("deep")),
+        };
+        let actual = terminal("shallow");
+        let diff = ExpressionDiff::from_expressions(&expected, &actual, false);
+        match diff {
+            ExpressionDiff::NotEqual { .. } => {}
+            other => panic!("expected NotEqual, got {other}"),
+        }
+    }
 }
