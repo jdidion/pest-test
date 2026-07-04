@@ -1,6 +1,5 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use proc_macro_error::{abort, abort_call_site, proc_macro_error};
 use quote::{format_ident, quote, ToTokens};
 use std::{borrow::Cow, path::PathBuf};
 use syn::{
@@ -24,24 +23,39 @@ struct Args {
 }
 
 impl Args {
-    fn from(attr_args: Vec<NestedMeta>) -> Self {
+    fn from(attr_args: Vec<NestedMeta>) -> syn::Result<Self> {
         let mut attr_args_iter = attr_args.into_iter();
 
         // process required attrs
         let parser_path = match attr_args_iter.next() {
             Some(NestedMeta::Meta(Meta::Path(path))) => path,
-            Some(other) => abort!(other, "Invalid parser type"),
-            None => abort_call_site!("Missing required argument <parser>"),
+            Some(other) => return Err(syn::Error::new_spanned(other, "Invalid parser type")),
+            None => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "Missing required argument <parser>",
+                ))
+            }
         };
         let rule_path = match attr_args_iter.next() {
             Some(NestedMeta::Meta(Meta::Path(path))) => path,
-            Some(other) => abort!(other, "Invalid rule"),
-            None => abort_call_site!("Missing required argument <rule>"),
+            Some(other) => return Err(syn::Error::new_spanned(other, "Invalid rule")),
+            None => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "Missing required argument <rule>",
+                ))
+            }
         };
         let rule_ident = match attr_args_iter.next() {
             Some(NestedMeta::Lit(Lit::Str(s))) => Ident::new(s.value().as_ref(), Span::call_site()),
-            Some(other) => abort!(other, "Invalid rule name"),
-            None => abort_call_site!("Missing required argument <root rule name>"),
+            Some(other) => return Err(syn::Error::new_spanned(other, "Invalid rule name")),
+            None => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "Missing required argument <root rule name>",
+                ))
+            }
         };
 
         let mut args = Args {
@@ -66,15 +80,25 @@ impl Args {
                     eq_token: _,
                     lit,
                 })) => {
-                    let attr_name = path
-                        .get_ident()
-                        .unwrap_or_else(|| abort!(path, "Invalid argument to pest_test_gen macro"))
-                        .to_string();
+                    let attr_name = match path.get_ident() {
+                        Some(ident) => ident.to_string(),
+                        None => {
+                            return Err(syn::Error::new_spanned(
+                                path,
+                                "Invalid argument to pest_test_gen macro",
+                            ))
+                        }
+                    };
                     match attr_name.as_str() {
                         "dir" => {
                             let mut path = match lit {
                                 Lit::Str(s) => PathBuf::from(s.value()),
-                                _ => abort!(lit, "Invalid argument to 'dir' attribute"),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Invalid argument to 'dir' attribute",
+                                    ))
+                                }
                             };
                             if path.is_relative() {
                                 path = pest_test::cargo_manifest_dir().join(path)
@@ -84,40 +108,75 @@ impl Args {
                         "subdir" => {
                             args.subdir = match lit {
                                 Lit::Str(s) => Some(PathBuf::from(s.value())),
-                                _ => abort!(lit, "Invalid argument to 'subdir' attribute"),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Invalid argument to 'subdir' attribute",
+                                    ))
+                                }
                             }
                         }
                         "ext" => {
                             args.ext = match lit {
                                 Lit::Str(s) => s.value(),
-                                _ => abort!(lit, "Invalid argument to 'ext' attribute"),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Invalid argument to 'ext' attribute",
+                                    ))
+                                }
                             }
                         }
                         "recursive" => {
                             args.recursive = match lit {
                                 Lit::Bool(b) => b.value,
-                                _ => abort!(lit, "Invalid argument to 'recursive' attribute"),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Invalid argument to 'recursive' attribute",
+                                    ))
+                                }
                             }
                         }
                         "strict" => {
                             args.strict = match lit {
                                 Lit::Bool(b) => b.value,
-                                _ => abort!(lit, "Invalid argument to 'strict' attribute"),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Invalid argument to 'strict' attribute",
+                                    ))
+                                }
                             }
                         }
                         "no_eoi" => {
                             args.no_eoi = match lit {
                                 Lit::Bool(b) => b.value,
-                                _ => abort!(lit, "Invalid argument to 'no_eoi' attribute"),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Invalid argument to 'no_eoi' attribute",
+                                    ))
+                                }
                             }
                         }
                         "lazy_static" => {
                             args.lazy_static = match lit {
                                 Lit::Bool(b) => b.value,
-                                _ => abort!(lit, "Invalid argument to 'lazy_static' attribute"),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Invalid argument to 'lazy_static' attribute",
+                                    ))
+                                }
                             }
                         }
-                        _ => abort!(path, "Invalid argument to pest_test_gen macro"),
+                        _ => {
+                            return Err(syn::Error::new_spanned(
+                                path,
+                                "Invalid argument to pest_test_gen macro",
+                            ))
+                        }
                     }
                 }
                 NestedMeta::Meta(Meta::List(MetaList {
@@ -125,10 +184,15 @@ impl Args {
                     paren_token: _,
                     nested,
                 })) => {
-                    let attr_name = path
-                        .get_ident()
-                        .unwrap_or_else(|| abort!(path, "Invalid argument to pest_test_gen macro"))
-                        .to_string();
+                    let attr_name = match path.get_ident() {
+                        Some(ident) => ident.to_string(),
+                        None => {
+                            return Err(syn::Error::new_spanned(
+                                path,
+                                "Invalid argument to pest_test_gen macro",
+                            ))
+                        }
+                    };
                     if attr_name == "skip_rule" {
                         for rule_meta in nested {
                             match rule_meta {
@@ -141,18 +205,31 @@ impl Args {
                                         args.no_eoi = true;
                                     }
                                 }
-                                _ => abort!(rule_meta, "Invalid skip_rule item"),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        rule_meta,
+                                        "Invalid skip_rule item",
+                                    ))
+                                }
                             }
                         }
                     } else {
-                        abort!(path, "Invalid argument to pest_test_gen macro");
+                        return Err(syn::Error::new_spanned(
+                            path,
+                            "Invalid argument to pest_test_gen macro",
+                        ));
                     }
                 }
-                _ => abort!(arg, "Invalid argument to pest_test_gen macro"),
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        arg,
+                        "Invalid argument to pest_test_gen macro",
+                    ))
+                }
             }
         }
 
-        args
+        Ok(args)
     }
 
     fn iter_tests(&self) -> impl Iterator<Item = String> + '_ {
@@ -201,7 +278,7 @@ fn rule_variant(rule_path: &Path, variant_ident: Ident) -> Path {
     path
 }
 
-fn add_tests(module: &mut ItemMod, args: &Args) {
+fn add_tests(module: &mut ItemMod, args: &Args) -> syn::Result<()> {
     let (_, content) = module.content.get_or_insert_with(Default::default);
 
     let test_dir = args.dir.as_os_str().to_str().unwrap().to_owned();
@@ -238,7 +315,12 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
         };
         let item: Item = match syn::parse2(lazy_static_tokens) {
             Ok(item) => item,
-            Err(err) => abort_call_site!(format!("Error generating lazy_static block: {:?}", err)),
+            Err(err) => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    format!("Error generating lazy_static block: {:?}", err),
+                ))
+            }
         };
         content.push(item);
     }
@@ -278,11 +360,16 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
         let item: Item = match syn::parse2(fn_tokens) {
             Ok(item) => item,
             Err(err) => {
-                abort_call_site!(format!("Error generating test fn {}: {:?}", test_name, err))
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    format!("Error generating test fn {}: {:?}", test_name, err),
+                ))
             }
         };
         content.push(item);
     }
+
+    Ok(())
 }
 
 /// When added to a test module, adds test functions for pest-test test cases. Must come before
@@ -328,16 +415,29 @@ fn add_tests(module: &mut ItemMod, args: &Args) {
 ///
 /// ```
 #[proc_macro_attribute]
-#[proc_macro_error]
 pub fn pest_tests(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let args = Args::from(parse_macro_input!(attr as AttributeArgs));
-    let mut module = match parse_macro_input!(item as Item) {
+    let attr_args = parse_macro_input!(attr as AttributeArgs);
+    let item = parse_macro_input!(item as Item);
+    match pest_tests_impl(attr_args, item) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+fn pest_tests_impl(
+    attr_args: Vec<NestedMeta>,
+    item: Item,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let args = Args::from(attr_args)?;
+    let mut module = match item {
         Item::Mod(module) => module,
-        other => abort!(
-            other,
-            "The pest_test_gen macro may only be used as an attribute on a module"
-        ),
+        other => {
+            return Err(syn::Error::new_spanned(
+                other,
+                "The pest_test_gen macro may only be used as an attribute on a module",
+            ))
+        }
     };
-    add_tests(&mut module, &args);
-    module.to_token_stream().into()
+    add_tests(&mut module, &args)?;
+    Ok(module.to_token_stream())
 }
