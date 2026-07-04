@@ -67,7 +67,7 @@ impl<R: RuleType, P: Parser<R>> PestTester<R, P> {
     /// file extension ".txt". Code is parsed beinning at `rule` and the rules in `skip_rule` are
     /// ignored when comparing to the expected expression.
     pub fn from_defaults(rule: R, skip_rules: HashSet<R>) -> Self {
-        Self::new(default_test_dir(), ".txt", rule, skip_rules)
+        Self::new(default_test_dir(), "txt", rule, skip_rules)
     }
 
     /// Evaluates the test with the given name. If `ignore_missing_expected_values` is true, then

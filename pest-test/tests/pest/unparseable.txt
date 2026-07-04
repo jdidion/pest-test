@@ -1,0 +1,12 @@
+Unparseable Code Test
+=====================
+
+this is not a valid function definition
+
+=====================
+
+(source_file
+  (function_definition
+    (identifier: "x")
+  )
+)
