@@ -1,5 +1,5 @@
 [alias]
-ci-test = "nextest run --all-features --locked"
+ci-test = "nextest run --all-features"
 ci-fmt = "fmt --all -- --check"
 ci-lint = "clippy --all-targets --all-features -- -D warnings"
 ci-cov = "llvm-cov --all-features --text"
