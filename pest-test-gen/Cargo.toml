@@ -15,7 +15,7 @@ proc-macro = true
 [dependencies]
 pest-test = { version = "0.1.7", path = "../pest-test" }
 proc-macro2 = "1.0.51"
-syn = { version = "1.0.107", features = ["full"] }
+syn = { version = "3.0.3", features = ["full"] }
 quote = "1.0.23"
 walkdir = "2.3.2"
 
